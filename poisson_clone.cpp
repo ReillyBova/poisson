@@ -2,8 +2,9 @@
 Reilly Bova '20
 COS 526: Assignment 1
 
-direct_clone.cpp
-Directly clones src into dest based on mask (non seamless)
+poisson_clone.cpp
+Clones src into dest based on mask using seamless Poisson cloning as described
+in Perez et al. in 2004
 */
 
 #include <cmath>
@@ -13,6 +14,16 @@ Directly clones src into dest based on mask (non seamless)
 
 /* Helper function: returns true if pixel is white */
 inline bool isWhite(Color &pixel)
+{
+  if (pixel.r == 255 && pixel.g == 255 && pixel.b == 255) {
+    return true;
+  }
+
+  return false;
+}
+
+/* Helper function: returns true if pixel is white */
+inline bool xyToOneDim(int x, int y)
 {
   if (pixel.r == 255 && pixel.g == 255 && pixel.b == 255) {
     return true;
@@ -50,7 +61,35 @@ int main(int argc, char *argv[])
 
 	printf("Read images of size %d x %d\n", dest.w(), dest.h());
 
-	/* Clone masked region from src to dest */
+  // Enforce equality between dims of dest and mask
+  if (dest.h() != mask.h() && dest.w() != mask.w()) {
+    fprintf(stderr, "Usage: dest and mask images must have identical dimensions \n", argv[0]);
+		exit(1);
+  }
+
+  // Number of pixels in dest and mask
+  int N = dest.pixels.size();
+
+  /* Map pixel indices to Omega membership, given by ID <id>. An ID of -1 implies
+  *  the pixel lies outside a mask (it may still be a boundary pixel though) */
+  ::std::vector<int> toOmega (N, -1);
+  int id = 0;
+  for (int i = N; i >= 0; i--) {
+    if (isWhite(mask[i])) {
+      toOmega[i] = id;
+      id++;
+    }
+  }
+
+  /* Now reverse the mapping now that we now how many ids we have */
+  ::std::vector<int> toMask (id);
+  for (int i = N; i >= 0; i--) {
+    if (toOmega[i] >= 0) {
+      toMask[toOmega[i]] = i;
+    }
+  }
+
+	/* Transform image - apply a vignetting filter */
   /* Assumption: images are of same {W X H} */
 	for (int y = dest.h() - 1; y >= 0; y--) {
 		for (int x = dest.h() - 1; x >= 0; x--) {
