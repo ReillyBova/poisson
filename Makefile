@@ -1,11 +1,11 @@
 CPPFLAGS = -O
-LDLIBS = -lm -ljpeg -lpng
+LDLIBS = -lm -ljpeg -lpng -lgsl
 
-all: direct_clone
+all: poisson_clone
 clean:
-	rm -f direct_close *.o
+	rm -f poisson_clone *.o
 
-direct_clone: direct_clone.o ./lib/imageio++.o
+poisson_clone: poisson_clone.o ./lib/imageio++.o
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
-direct_clone.o: ./lib/imageio++.h
+poisson_clone.o: ./lib/imageio++.h
 imageio++.o: ./lib/imageio++.h
