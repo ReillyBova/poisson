@@ -32,7 +32,7 @@ inline bool isWhite(Color &pixel)
  * out of bounds). The status type are as follows:
 *    1 -> in Omega
 *    0 -> in boundary of Omega
-*   -1 -> not in mask
+*   -1 -> not in image
 *
 * NB: p must be valid, as there is no boundary checking
 */
@@ -89,7 +89,7 @@ inline std::vector< std::vector<int> > getNeighbors(int p, int w, int h, ::std::
     results[2][0] = -1;
   }
 
-  // South
+  // West
   q = p - 1;
   results[3][1] = q;
   if ((p % w) != 0) {
@@ -112,9 +112,9 @@ inline std::vector< std::vector<int> > getNeighbors(int p, int w, int h, ::std::
  * Rmk: computed as g(p) - g(q)
  * NB: Does not check boundaries
  */
-inline double guidance(Im src, int p, int q, int channel)
+inline double guidance(Im* src, int p, int q, int channel)
 {
-  return (double) (src[p][channel] - src[q][channel]);
+  return ((double) (*src)[p][channel] - ((double) (*src)[q][channel]));
 }
 
 /* Helper function: solve a sparse linear system of equations of form Ax = b
@@ -123,7 +123,7 @@ inline double guidance(Im src, int p, int q, int channel)
 inline int solve(gsl_spmatrix *A, gsl_vector *x, gsl_vector *b, int OMEGA_SIZE)
 {
   const double tol = 1.0e-6;  /* solution relative tolerance */
-  const size_t max_iter = 10; /* maximum iterations */
+  const size_t max_iter = 1000; /* maximum iterations */
   const gsl_splinalg_itersolve_type *T = gsl_splinalg_itersolve_gmres;
   gsl_splinalg_itersolve *work = gsl_splinalg_itersolve_alloc(T, OMEGA_SIZE, 0);
   size_t iter = 0;
@@ -140,7 +140,7 @@ inline int solve(gsl_spmatrix *A, gsl_vector *x, gsl_vector *b, int OMEGA_SIZE)
 
       /* print out residual norm ||A*u - f|| */
       residual = gsl_splinalg_itersolve_normr(work);
-      fprintf(stderr, "iter %zu residual = %.12e\n", iter, residual);
+      //fprintf(stderr, "iter %zu residual = %.12e\n", iter, residual);
 
       if (status == GSL_SUCCESS)
         fprintf(stderr, "Converged\n");
@@ -153,8 +153,8 @@ inline int solve(gsl_spmatrix *A, gsl_vector *x, gsl_vector *b, int OMEGA_SIZE)
 }
 
 /* Helper function: set channel of pixel p in dest to value v */
-inline void setPixel(Im dest, int p, double v, int channel) {
-  int c = (unsigned char) v;
+inline void setPixel(Im* dest, int p, double v, int channel) {
+  unsigned char c = (unsigned char) v;
 
   // Clamp
   if (c > 255) {
@@ -163,7 +163,7 @@ inline void setPixel(Im dest, int p, double v, int channel) {
     c = 0;
   }
 
-  dest[p][channel] = c;
+  (*dest)[p][channel] = c;
   return;
 }
 
@@ -211,17 +211,17 @@ int main(int argc, char *argv[])
   *  the pixel lies outside a mask (it may still be a boundary pixel though) */
   ::std::vector<int> toOmega (N, -1);
   int id = 0;
-  for (int i = N; i >= 0; i--) {
+  for (int i = N - 1; i >= 0; i--) {
     if (isWhite(mask[i])) {
       toOmega[i] = id;
       id++;
     }
   }
 
-  /* Now reverse the mapping now that we now how many ids we have */
+  /* Now reverse the mapping now that we know how many ids we have */
   int OMEGA_SIZE = id;
   ::std::vector<int> toMask (OMEGA_SIZE);
-  for (int i = N; i >= 0; i--) {
+  for (int i = N - 1; i >= 0; i--) {
     if (toOmega[i] >= 0) {
       toMask[toOmega[i]] = i;
     }
@@ -237,10 +237,10 @@ int main(int argc, char *argv[])
     gsl_spmatrix *A = gsl_spmatrix_alloc(OMEGA_SIZE, OMEGA_SIZE);
 
     /* Iterate through the pixels in Omega... */
-    for (int id = OMEGA_SIZE; id >= 0; id--) {
+    for (int id = OMEGA_SIZE - 1; id >= 0; id--) {
       int p = toMask[id]; // Pixel index in dest and mask
       int Np = 0;         // Number of cardinal neighbors in image
-      double b_val;              // RHS of equation
+      double b_val = 0.0;       // RHS of equation
 
       std::vector< std::vector<int> > neighbors = getNeighbors(p, W, H, toOmega);
 
@@ -255,7 +255,7 @@ int main(int argc, char *argv[])
         }
 
         Np++; // Count the neighbor
-        b_val += guidance(src, p, q, channel); // Guidance constraint
+        b_val += guidance(&src, p, q, channel); // Guidance constraint
 
         // For q in Omega
         if (status == 1) {
@@ -280,8 +280,8 @@ int main(int argc, char *argv[])
     solve(A, x, b, OMEGA_SIZE);
 
     /* Copy into dest */
-    for (int j = OMEGA_SIZE; j >= 0; j--) {
-      setPixel(dest, toMask[j], gsl_vector_get(x, j), channel);
+    for (int j = OMEGA_SIZE - 1; j >= 0; j--) {
+      setPixel(&dest, toMask[j], gsl_vector_get(x, j), channel);
     }
 
     /* Free mem */

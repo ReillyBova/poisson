@@ -1,5 +1,5 @@
 CPPFLAGS = -O
-LDLIBS = -lm -ljpeg -lpng -lgsl
+LDLIBS = -lm -ljpeg -lpng -lgsl -lgslcblas
 
 all: poisson_clone
 clean:
