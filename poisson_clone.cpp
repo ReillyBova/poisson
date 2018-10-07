@@ -16,10 +16,10 @@ in Perez et al. in 2004
 
 #include "./lib/imageio++.h"
 
-/* Helper function: returns true if pixel is white */
+/* Helper function: returns true if pixel is whitish */
 inline bool isWhite(Color &pixel)
 {
-  if (pixel.r == 255 && pixel.g == 255 && pixel.b == 255) {
+  if (pixel.r > 240 && pixel.g > 240 && pixel.b > 240) {
     return true;
   }
 
@@ -36,7 +36,7 @@ inline bool isWhite(Color &pixel)
 *
 * NB: p must be valid, as there is no boundary checking
 */
-inline std::vector< std::vector<int> > getNeighbors(int p, int w, int h, ::std::vector<int> toOmega)
+inline std::vector< std::vector<int> > getNeighbors(int p, int w, int h, ::std::vector<int>* toOmega)
 {
   std::vector< std::vector<int> > results (4, std::vector<int>(3, 0));
   int q;
@@ -44,8 +44,8 @@ inline std::vector< std::vector<int> > getNeighbors(int p, int w, int h, ::std::
   // North
   q = p - w;
   results[0][1] = q;
-  if (q > 0) {
-    if (toOmega[q] != -1) {
+  if (q >= 0) {
+    if ((*toOmega)[q] != -1) {
       // q is in Omega
       results[0][0] = 1;
     } else {
@@ -61,7 +61,7 @@ inline std::vector< std::vector<int> > getNeighbors(int p, int w, int h, ::std::
   q = p + 1;
   results[1][1] = q;
   if ((q % w) != 0) {
-    if (toOmega[q] != -1) {
+    if ((*toOmega)[q] != -1) {
       // q is in Omega
       results[1][0] = 1;
     } else {
@@ -77,7 +77,7 @@ inline std::vector< std::vector<int> > getNeighbors(int p, int w, int h, ::std::
   q = p + w;
   results[2][1] = q;
   if (((int) q / w) < h) {
-    if (toOmega[q] != -1) {
+    if ((*toOmega)[q] != -1) {
       // q is in Omega
       results[2][0] = 1;
     } else {
@@ -93,7 +93,7 @@ inline std::vector< std::vector<int> > getNeighbors(int p, int w, int h, ::std::
   q = p - 1;
   results[3][1] = q;
   if ((p % w) != 0) {
-    if (toOmega[q] != -1) {
+    if ((*toOmega)[q] != -1) {
       // q is in Omega
       results[3][0] = 1;
     } else {
@@ -114,7 +114,7 @@ inline std::vector< std::vector<int> > getNeighbors(int p, int w, int h, ::std::
  */
 inline double guidance(Im* src, int p, int q, int channel)
 {
-  return ((double) (*src)[p][channel] - ((double) (*src)[q][channel]));
+  return (((double) (*src)[p][channel]) - ((double) (*src)[q][channel]));
 }
 
 /* Helper function: solve a sparse linear system of equations of form Ax = b
@@ -130,40 +130,35 @@ inline int solve(gsl_spmatrix *A, gsl_vector *x, gsl_vector *b, int OMEGA_SIZE)
   double residual;
   int status;
 
-  /* initial guess u = 0 */
+  /* initial guess x = 0 */
   gsl_vector_set_zero(x);
 
   /* solve the system Ax = b */
-  do
-    {
-      status = gsl_splinalg_itersolve_iterate(A, b, tol, x, work);
+  do {
+    status = gsl_splinalg_itersolve_iterate(A, b, tol, x, work);
 
-      /* print out residual norm ||A*u - f|| */
-      residual = gsl_splinalg_itersolve_normr(work);
-      //fprintf(stderr, "iter %zu residual = %.12e\n", iter, residual);
+    /* print out residual norm ||A*x - b|| */
+    //residual = gsl_splinalg_itersolve_normr(work);
+    //fprintf(stderr, "iter %zu residual = %.12e\n", iter, residual);
 
-      if (status == GSL_SUCCESS)
-        fprintf(stderr, "Converged\n");
-    }
-  while (status == GSL_CONTINUE && ++iter < max_iter);
+    if (status == GSL_SUCCESS)
+      fprintf(stderr, "Converged\n");
+  } while (status == GSL_CONTINUE && ++iter < max_iter);
 
   gsl_splinalg_itersolve_free(work);
-
   return status;
 }
 
 /* Helper function: set channel of pixel p in dest to value v */
 inline void setPixel(Im* dest, int p, double v, int channel) {
-  unsigned char c = (unsigned char) v;
-
   // Clamp
-  if (c > 255) {
-    c = 255;
-  } else if (c < 0){
-    c = 0;
+  if (v > 255) {
+    v = 255;
+  } else if (v < 0){
+    v = 0;
   }
 
-  (*dest)[p][channel] = c;
+  (*dest)[p][channel] = (unsigned char) v;
   return;
 }
 
@@ -227,68 +222,82 @@ int main(int argc, char *argv[])
     }
   }
 
-  /* For each channel, apply poisson cloning to dest */
-  for (int channel = 0; channel < 3; channel++) {
-    /* Initialize system of equations */
-    gsl_vector *b = gsl_vector_alloc(OMEGA_SIZE);  /* vector of "knowns" (RHS) */
-    gsl_vector *x = gsl_vector_alloc(OMEGA_SIZE);  /* vector for solutions (LHS) */
+  /* Initialize system of equations */
+  // RHS
+  gsl_vector *r = gsl_vector_alloc(OMEGA_SIZE);  /* vector of "known reds" */
+  gsl_vector *g = gsl_vector_alloc(OMEGA_SIZE);  /* vector of "known greens" */
+  gsl_vector *b = gsl_vector_alloc(OMEGA_SIZE);  /* vector of "known blues" */
 
-    /* Sparse matrix of coefficients (LHS) */
-    gsl_spmatrix *A = gsl_spmatrix_alloc(OMEGA_SIZE, OMEGA_SIZE);
+  /* Sparse matrix of coefficients (LHS) */
+  gsl_spmatrix *A = gsl_spmatrix_alloc(OMEGA_SIZE, OMEGA_SIZE);
+  gsl_vector *x = gsl_vector_alloc(OMEGA_SIZE);  /* vector for solutions (LHS) */
 
-    /* Iterate through the pixels in Omega... */
-    for (int id = OMEGA_SIZE - 1; id >= 0; id--) {
-      int p = toMask[id]; // Pixel index in dest and mask
-      int Np = 0;         // Number of cardinal neighbors in image
-      double b_val = 0.0;       // RHS of equation
+  /* Iterate through the pixels in Omega... */
+  for (int id = OMEGA_SIZE - 1; id >= 0; id--) {
+    int p = toMask[id]; // Pixel index in dest and mask
+    int Np = 0;         // Number of cardinal neighbors in image
+    double r_val = 0.0; // RHS of equation
+    double g_val = 0.0; // RHS of equation
+    double b_val = 0.0; // RHS of equation
 
-      std::vector< std::vector<int> > neighbors = getNeighbors(p, W, H, toOmega);
+    std::vector< std::vector<int> > neighbors = getNeighbors(p, W, H, &toOmega);
 
-      // For each neighbor q....
-      for (int j = 0; j < 4; j++) {
-        int status = neighbors[j][0];
-        int q = neighbors[j][1];
+    // For each neighbor q....
+    for (int j = 0; j < 4; j++) {
+      int status = neighbors[j][0];
+      int q = neighbors[j][1];
 
-        // Ignore pixels outside the image
-        if (status == -1) {
-          continue;
-        }
-
-        Np++; // Count the neighbor
-        b_val += guidance(&src, p, q, channel); // Guidance constraint
-
-        // For q in Omega
-        if (status == 1) {
-          // -fq component
-          int q_id = toOmega[q];
-          gsl_spmatrix_set(A, id, q_id, -1.0);
-        }
-        // For q in boundary of Omega
-        if (status == 0) {
-          // f* boundary constraint
-          b_val += (double) dest[q][channel];
-        }
+      // Ignore pixels outside the image
+      if (status == -1) {
+        continue;
       }
 
-      // Np*fp component
-      gsl_spmatrix_set(A, id, id, (double) Np);
-      // Record constraint
-      gsl_vector_set(b, id, b_val);
+      Np++; // Count the neighbor
+      r_val += guidance(&src, p, q, 0); // Guidance constraint
+      g_val += guidance(&src, p, q, 1); // Guidance constraint
+      b_val += guidance(&src, p, q, 2); // Guidance constraint
+
+      // For q in Omega
+      if (status == 1) {
+        // -fq component
+        int q_id = toOmega[q];
+        gsl_spmatrix_set(A, id, q_id, -1.0);
+      }
+      // For q in boundary of Omega
+      if (status == 0) {
+        // f* boundary constraint
+        r_val += (double) dest[q][0];
+        g_val += (double) dest[q][1];
+        b_val += (double) dest[q][2];
+      }
     }
 
-    /* Sparsely solve the systems of equations for this channel */
-    solve(A, x, b, OMEGA_SIZE);
+    // Np*fp component
+    gsl_spmatrix_set(A, id, id, (double) Np);
+    // Record constraints
+    gsl_vector_set(r, id, r_val);
+    gsl_vector_set(g, id, g_val);
+    gsl_vector_set(b, id, b_val);
+  }
+
+  /* Sparsely solve the systems of equations for each channel */
+  for (int c = 0; c < 3; c++) {
+    if (c == 0) solve(A, x, r, OMEGA_SIZE);
+    else if (c == 1) solve(A, x, g, OMEGA_SIZE);
+    else if (c == 2) solve(A, x, b, OMEGA_SIZE);
 
     /* Copy into dest */
     for (int j = OMEGA_SIZE - 1; j >= 0; j--) {
-      setPixel(&dest, toMask[j], gsl_vector_get(x, j), channel);
+      setPixel(&dest, toMask[j], gsl_vector_get(x, j), c);
     }
-
-    /* Free mem */
-    gsl_spmatrix_free(A);
-    gsl_vector_free(x);
-    gsl_vector_free(b);
   }
+
+  /* Free mem */
+  gsl_spmatrix_free(A);
+  gsl_vector_free(x);
+  gsl_vector_free(r);
+  gsl_vector_free(g);
+  gsl_vector_free(b);
 
 	/* Write image back out */
 	if (!dest.write(outfilename))
