@@ -150,6 +150,14 @@ inline double guidance(Im &src, Im &dest, int p, int q, int xOff, int yOff, int 
     } else {
       return gradg;
     }
+  } if (mode == 2) {
+    // flat mode (lazy way... threshol :P)
+    double gradg = ((double) src(pu, pv)[channel]) - ((double) src(qu, qv)[channel]);
+    if (abs(gradg) > 5) {
+      return (gradg / 255.0);
+    } else {
+      return 0;
+    }
   } else {
     // default (mode == 0 presumably)
     return (((double) src(pu, pv)[channel]) - ((double) src(qu, qv)[channel])) / 255.0;
@@ -416,7 +424,7 @@ Main
 int main(int argc, char *argv[])
 {
   if (argc < 7) {
-    fprintf(stderr, "Usage: %s src.png mask.png dest.png out.png xOffset yOffset [(-d || -direct) || (-mono || -monochrome)]\n", argv[0]);
+    fprintf(stderr, "Usage: %s src.png mask.png dest.png out.png xOffset yOffset [(-d || -direct) || (-mono || -monochrome) || (-mx || -mixed)]\n", argv[0]);
     exit(1);
   }
   const char *srcfilename = argv[1];
@@ -456,6 +464,8 @@ int main(int argc, char *argv[])
   std::string mono_long = "-monochrome";
   std::string mx_short = "-mx";
   std::string mx_long = "-mixed";
+  std::string f_short = "-f";
+  std::string f_long = "-flat";
 
   // Use flag to determine cloning method
   int error = 0;
@@ -471,6 +481,10 @@ int main(int argc, char *argv[])
   } else if (argc == 8 && (mx_short.compare(argv[7]) == 0 || mx_long.compare(argv[7]) == 0)) {
     // Apply poisson cloning in mixed mode
     int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename, 1);
+    if (error) exit(1);
+  } else if (argc == 8 && (f_short.compare(argv[7]) == 0 || f_long.compare(argv[7]) == 0)) {
+    // Apply poisson cloning in flatten mode (only keep high gradients)
+    int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename, 2);
     if (error) exit(1);
   } else {
     // Apply Poisson seamless cloning
