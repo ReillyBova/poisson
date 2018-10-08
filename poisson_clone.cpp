@@ -366,21 +366,21 @@ Main
 *******************************************************************************/
 
 /* Main function sample usage:
- * $ ./poisson_clone ./test_images/perez-fig4a-src.png 0 0 ./test_images/perez-fig4a-mask.png ./test_images/perez-fig4a-dst.png direct.png -direct
- * $ ./poisson_clone ./test_images/perez-fig4a-src-orig.png -11 52 ./test_images/perez-fig4a-mask.png ./test_images/perez-fig4a-dst.png out.png
+ * $ ./poisson_clone ./test_images/perez-fig4a-src.png ./test_images/perez-fig4a-mask.png ./test_images/perez-fig4a-dst.png direct.png 0 0 -direct
+ * $ ./poisson_clone ./test_images/perez-fig4a-src-orig.png ./test_images/perez-fig4a-mask.png ./test_images/perez-fig4a-dst.png -11 52 out.png
  */
 int main(int argc, char *argv[])
 {
 	if (argc < 7) {
-		fprintf(stderr, "Usage: %s src.png xOffset yOffset mask.png dest.png out.png [(-d || -direct)]\n", argv[0]);
+		fprintf(stderr, "Usage: %s src.png mask.png dest.png out.png xOffset yOffset [(-d || -direct)]\n", argv[0]);
 		exit(1);
 	}
 	const char *srcfilename = argv[1];
-  const int xOff = atoi(argv[2]);
-  const int yOff = atoi(argv[3]);
-  const char *maskfilename = argv[4];
-	const char *destfilename = argv[5];
-	const char *outfilename = argv[6];
+  const char *maskfilename = argv[2];
+	const char *destfilename = argv[3];
+	const char *outfilename = argv[4];
+  const int xOff = atoi(argv[5]);
+  const int yOff = atoi(argv[6]);
 
 	/* Read the src image */
 	Im src;
