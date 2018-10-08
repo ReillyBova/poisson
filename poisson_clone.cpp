@@ -420,6 +420,8 @@ Main
 * $ ./poisson_clone ./test_images/perez-fig3b-src2-orig.png ./test_images/perez-fig3b-mask3.png ./out.png out.png -67 98
 * $ nice -20 ./poisson_clone ./test_images/perez-fig5-src.png ./test_images/perez-fig5-mask.png ./test_images/perez-fig5-dst.png ./results/fig5_mono.png -40 52 -mono
 * $ nice -20 ./poisson_clone ./test_images/perez-fig6-src.png ./test_images/perez-fig6-mask.png ./test_images/perez-fig6-dst.png ./results/fig6_mixed.png 25 20 -mx
+*
+* $ $ ./poisson_clone ./custom_images/eisg.png ./custom_images/wash-mask.jpg ./custom_images/wash.jpg out.png 486 300
 */
 int main(int argc, char *argv[])
 {
