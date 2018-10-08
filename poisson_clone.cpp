@@ -368,6 +368,12 @@ Main
 /* Main function sample usage:
  * $ ./poisson_clone ./test_images/perez-fig4a-src.png ./test_images/perez-fig4a-mask.png ./test_images/perez-fig4a-dst.png direct.png 0 0 -direct
  * $ ./poisson_clone ./test_images/perez-fig4a-src-orig.png ./test_images/perez-fig4a-mask.png ./test_images/perez-fig4a-dst.png -11 52 out.png
+ *
+ * $ ./poisson_clone ./test_images/perez-fig3a-src-orig.png ./test_images/perez-fig3a-mask.png ./test_images/perez-fig3a-dst.png out.png -33 -33
+ *
+ * $ ./poisson_clone ./test_images/perez-fig3b-src1-orig.png ./test_images/perez-fig3b-mask1.png ./test_images/perez-fig3b-dst.png out.png 33 24
+ * $ ./poisson_clone ./test_images/perez-fig3b-src2-orig.png ./test_images/perez-fig3b-mask2.png ./out.png out.png 20 110
+ * $ ./poisson_clone ./test_images/perez-fig3b-src2-orig.png ./test_images/perez-fig3b-mask3.png ./out.png out.png -67 98
  */
 int main(int argc, char *argv[])
 {
