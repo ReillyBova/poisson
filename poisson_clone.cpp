@@ -141,7 +141,19 @@ inline double guidance(Im &src, Im &dest, int p, int q, int xOff, int yOff, int 
     return 0;
   }
 
-  return (((double) src(pu, pv)[channel]) - ((double) src(qu, qv)[channel])) / 255.0;
+  if (mode == 1) {
+    // mixed mode
+    double gradg = (((double) src(pu, pv)[channel]) - ((double) src(qu, qv)[channel])) / 255.0;
+    double gradf = (((double) dest[p][channel]) - ((double) dest[q][channel])) / 255.0;
+    if (abs(gradf) > abs(gradg)) {
+      return gradf;
+    } else {
+      return gradg;
+    }
+  } else {
+    // default (mode == 0 presumably)
+    return (((double) src(pu, pv)[channel]) - ((double) src(qu, qv)[channel])) / 255.0;
+  }
 }
 
 /* Set channel of pixel p in dest to value v in range [0-1] */
@@ -282,9 +294,9 @@ inline int poisson_clone(Im &src, Im &mask, Im dest, int xOff, int yOff, const c
       }
 
       Np++; // Count the neighbor
-      r_val += guidance(src, p, q, xOff, yOff, W, 0, mode); // Guidance constraint
-      g_val += guidance(src, p, q, xOff, yOff, W, 1, mode); // Guidance constraint
-      b_val += guidance(src, p, q, xOff, yOff, W, 2, mode); // Guidance constraint
+      r_val += guidance(src, dest, p, q, xOff, yOff, 0, mode); // Guidance constraint
+      g_val += guidance(src, dest, p, q, xOff, yOff, 1, mode); // Guidance constraint
+      b_val += guidance(src, dest, p, q, xOff, yOff, 2, mode); // Guidance constraint
 
       // For q in Omega
       if (status == 1) {
@@ -399,6 +411,7 @@ Main
 * $ ./poisson_clone ./test_images/perez-fig3b-src2-orig.png ./test_images/perez-fig3b-mask2.png ./out.png out.png 20 110
 * $ ./poisson_clone ./test_images/perez-fig3b-src2-orig.png ./test_images/perez-fig3b-mask3.png ./out.png out.png -67 98
 * $ nice -20 ./poisson_clone ./test_images/perez-fig5-src.png ./test_images/perez-fig5-mask.png ./test_images/perez-fig5-dst.png ./results/fig5_mono.png -40 52 -mono
+* $ nice -20 ./poisson_clone ./test_images/perez-fig6-src.png ./test_images/perez-fig6-mask.png ./test_images/perez-fig6-dst.png ./results/fig6_mixed.png 25 20 -mx
 */
 int main(int argc, char *argv[])
 {
@@ -441,6 +454,8 @@ int main(int argc, char *argv[])
   std::string d_long = "-direct";
   std::string mono_short = "-mono";
   std::string mono_long = "-monochrome";
+  std::string mx_short = "-mx";
+  std::string mx_long = "-mixed";
 
   // Use flag to determine cloning method
   int error = 0;
@@ -452,6 +467,10 @@ int main(int argc, char *argv[])
     // Convert src to monochrome and then apply poisson cloning
     src = imToMonochrome(src);
     int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename, 0);
+    if (error) exit(1);
+  } else if (argc == 8 && (mx_short.compare(argv[7]) == 0 || mx_long.compare(argv[7]) == 0)) {
+    // Apply poisson cloning in mixed mode
+    int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename, 1);
     if (error) exit(1);
   } else {
     // Apply Poisson seamless cloning
