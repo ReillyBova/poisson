@@ -117,9 +117,30 @@ inline std::vector< std::vector<int> > getNeighbors(int p, int w, int h, ::std::
  * Rmk: computed as g(p) - g(q)
  * NB: Does not check boundaries
  */
-inline double guidance(Im &src, int p, int q, int channel)
+inline double guidance(Im &src, int p, int q, int xOff, int yOff, int destW, int channel)
 {
-  return (((double) src[p][channel]) - ((double) src[q][channel])) / 255.0;
+  // Take into account offsets; set gradient to 0 if either pixel goes outside!
+  int W = src.w();
+  int H = src.h();
+
+  // Coords in Dest
+  int px = p % destW;
+  int py = p / destW;
+  int qx = q % destW;
+  int qy = q / destW;
+
+  // Coords in src
+  int pu = px - xOff;
+  int pv = py - yOff;
+  int qu = qx - xOff;
+  int qv = qy - yOff;
+
+  // Check boundaries
+  if (pu < 0 || pv < 0 || qu < 0 || qv < 0 || pu >= W || qu >= W || pv >= H || qv >= H) {
+    return 0;
+  }
+
+  return (((double) src(pu, pv)[channel]) - ((double) src(qu, qv)[channel])) / 255.0;
 }
 
 /* Set channel of pixel p in dest to value v in range [0-1] */
@@ -175,7 +196,7 @@ Poisson Seamless Cloning
 *******************************************************************************/
 
 // Implements poisson seamless cloning
-inline int poisson_clone(Im &src, Im dest, Im &mask, const char* outfilename)
+inline int poisson_clone(Im &src, Im &mask, Im dest, int xOff, int yOff, const char* outfilename)
 {
     // Number of pixels in dest and mask
     int W = dest.w();
@@ -237,9 +258,9 @@ inline int poisson_clone(Im &src, Im dest, Im &mask, const char* outfilename)
         }
 
         Np++; // Count the neighbor
-        r_val += guidance(src, p, q, 0); // Guidance constraint
-        g_val += guidance(src, p, q, 1); // Guidance constraint
-        b_val += guidance(src, p, q, 2); // Guidance constraint
+        r_val += guidance(src, p, q, xOff, yOff, W, 0); // Guidance constraint
+        g_val += guidance(src, p, q, xOff, yOff, W, 1); // Guidance constraint
+        b_val += guidance(src, p, q, xOff, yOff, W, 2); // Guidance constraint
 
         // For q in Omega
         if (status == 1) {
@@ -289,8 +310,10 @@ inline int poisson_clone(Im &src, Im dest, Im &mask, const char* outfilename)
     gsl_vector_free(b);
 
   	/* Write image back out */
-  	if (!dest.write(outfilename))
+  	if (!dest.write(outfilename)){
+      fprintf(stderr, "Error: poisson cloning write failed\n");
   		return 1;
+    }
 
   	return 0;
 }
@@ -300,11 +323,14 @@ Direct Cloning
 *******************************************************************************/
 
 // Implements direct [seamed] cloning
-inline int direct_clone(Im &src, Im dest, Im &mask, const char* outfilename)
+inline int direct_clone(Im &src, Im &mask, Im dest, int xOff, int yOff, const char* outfilename)
 {
     // Number of pixels in dest and mask
     int W = dest.w();
     int H = dest.h();
+
+    int srcW = src.w();
+    int srcH = src.h();
 
     printf("Direct cloning...\n");
 
@@ -313,18 +339,24 @@ inline int direct_clone(Im &src, Im dest, Im &mask, const char* outfilename)
   		for (int x = W - 1; x >= 0; x--) {
         // Copy src onto dest if mask is white
   			if (isWhite(mask(x, y))) {
-          Color &src_pixel = src(x, y);
-          Color &dest_pixel = dest(x, y);
+          int u = x - xOff;
+          int v = y - yOff;
+          if (0 <= u && 0 <= v && u < srcW && v < srcH) {
+            Color &src_pixel = src(u, v);
+            Color &dest_pixel = dest(x, y);
 
-    			for (int j = 0; j < 3; j++)
-    				dest_pixel[j] = (unsigned char) src_pixel[j];
+      			for (int j = 0; j < 3; j++)
+      				dest_pixel[j] = (unsigned char) src_pixel[j];
+          }
         }
       }
   	}
 
   	/* Write image back out */
-  	if (!dest.write(outfilename))
+  	if (!dest.write(outfilename)) {
+      fprintf(stderr, "Error: direct cloning write failed\n");
   		return 1;
+    }
 
   	return 0;
 }
@@ -333,17 +365,22 @@ inline int direct_clone(Im &src, Im dest, Im &mask, const char* outfilename)
 Main
 *******************************************************************************/
 
-/* Main function */
+/* Main function sample usage:
+ * $ ./poisson_clone ./test_images/perez-fig4a-src.png 0 0 ./test_images/perez-fig4a-mask.png ./test_images/perez-fig4a-dst.png direct.png -direct
+ * $ ./poisson_clone ./test_images/perez-fig4a-src-orig.png -11 52 ./test_images/perez-fig4a-mask.png ./test_images/perez-fig4a-dst.png out.png
+ */
 int main(int argc, char *argv[])
 {
-	if (argc < 5) {
-		fprintf(stderr, "Usage: %s src.png dest.png mask.png poisson_out.png [(-d | -direct) flag_mode_out.png]\n", argv[0]);
+	if (argc < 7) {
+		fprintf(stderr, "Usage: %s src.png xOffset yOffset mask.png dest.png out.png [(-d || -direct)]\n", argv[0]);
 		exit(1);
 	}
 	const char *srcfilename = argv[1];
-	const char *destfilename = argv[2];
-  const char *maskfilename = argv[3];
-	const char *outfilename = argv[4];
+  const int xOff = atoi(argv[2]);
+  const int yOff = atoi(argv[3]);
+  const char *maskfilename = argv[4];
+	const char *destfilename = argv[5];
+	const char *outfilename = argv[6];
 
 	/* Read the src image */
 	Im src;
@@ -368,19 +405,21 @@ int main(int argc, char *argv[])
 		exit(1);
   }
 
-  // Apply Poisson seamless cloning
-  int error = poisson_clone(src, dest, mask, outfilename);
-  if (error) exit(1);
+  // Flags
+  std::string d_short = "-d";
+  std::string d_long = "-direct";
 
-
-  // Apply direct cloning if necessary
-  std::string flag_short = "-d";
-  std::string flag_long = "-direct";
-  if (argc == 7 && (flag_short.compare(argv[5]) == 0 || flag_long.compare(argv[5]) == 0)) {
-    error = direct_clone(src, dest, mask, argv[6]);
+  // Use flag to determine cloning method
+  int error = 0;
+  if (argc == 8 && (d_short.compare(argv[7]) == 0 || d_long.compare(argv[7]) == 0)) {
+    // Apply direct cloning
+    error = direct_clone(src, mask, dest, xOff, yOff, outfilename);
+    if (error) exit(1);
+  } else {
+    // Apply Poisson seamless cloning
+    int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename);
     if (error) exit(1);
   }
-
 
   exit(0);
 }
