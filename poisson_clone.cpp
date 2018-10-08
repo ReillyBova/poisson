@@ -8,6 +8,7 @@ in Perez et al. in 2004
 */
 
 #include <cmath>
+#include <string>
 #include <cstdio>
 #include <cstdlib>
 #include <gsl/gsl_vector.h>
@@ -16,7 +17,11 @@ in Perez et al. in 2004
 
 #include "./lib/imageio++.h"
 
-/* Helper function: returns true if pixel is whitish */
+/*******************************************************************************
+Helper functions
+*******************************************************************************/
+
+/* Returns true if pixel is whitish */
 inline bool isWhite(Color &pixel)
 {
   if (pixel.r > 240 && pixel.g > 240 && pixel.b > 240) {
@@ -26,7 +31,7 @@ inline bool isWhite(Color &pixel)
   return false;
 }
 
-/* Helper function: return a [N, E, S, W] array of int arrays containg a pair of values:
+/* Return a [N, E, S, W] array of int arrays containg a pair of values:
  * The first index denotes the "status" of the pixel q in the corresponding
  * cardinal direction to p, and the second index will be q's index (potentially
  * out of bounds). The status type are as follows:
@@ -36,7 +41,7 @@ inline bool isWhite(Color &pixel)
 *
 * NB: p must be valid, as there is no boundary checking
 */
-inline std::vector< std::vector<int> > getNeighbors(int p, int w, int h, ::std::vector<int>* toOmega)
+inline std::vector< std::vector<int> > getNeighbors(int p, int w, int h, ::std::vector<int> &toOmega)
 {
   std::vector< std::vector<int> > results (4, std::vector<int>(3, 0));
   int q;
@@ -45,7 +50,7 @@ inline std::vector< std::vector<int> > getNeighbors(int p, int w, int h, ::std::
   q = p - w;
   results[0][1] = q;
   if (q >= 0) {
-    if ((*toOmega)[q] != -1) {
+    if (toOmega[q] != -1) {
       // q is in Omega
       results[0][0] = 1;
     } else {
@@ -61,7 +66,7 @@ inline std::vector< std::vector<int> > getNeighbors(int p, int w, int h, ::std::
   q = p + 1;
   results[1][1] = q;
   if ((q % w) != 0) {
-    if ((*toOmega)[q] != -1) {
+    if (toOmega[q] != -1) {
       // q is in Omega
       results[1][0] = 1;
     } else {
@@ -77,7 +82,7 @@ inline std::vector< std::vector<int> > getNeighbors(int p, int w, int h, ::std::
   q = p + w;
   results[2][1] = q;
   if (((int) q / w) < h) {
-    if ((*toOmega)[q] != -1) {
+    if (toOmega[q] != -1) {
       // q is in Omega
       results[2][0] = 1;
     } else {
@@ -93,7 +98,7 @@ inline std::vector< std::vector<int> > getNeighbors(int p, int w, int h, ::std::
   q = p - 1;
   results[3][1] = q;
   if ((p % w) != 0) {
-    if ((*toOmega)[q] != -1) {
+    if (toOmega[q] != -1) {
       // q is in Omega
       results[3][0] = 1;
     } else {
@@ -108,16 +113,30 @@ inline std::vector< std::vector<int> > getNeighbors(int p, int w, int h, ::std::
   return results;
 }
 
-/* Helper function: returns the guidance v between p and q
+/* Returns the guidance v between p and q
  * Rmk: computed as g(p) - g(q)
  * NB: Does not check boundaries
  */
-inline double guidance(Im* src, int p, int q, int channel)
+inline double guidance(Im &src, int p, int q, int channel)
 {
-  return (((double) (*src)[p][channel]) - ((double) (*src)[q][channel])) / 255.0;
+  return (((double) src[p][channel]) - ((double) src[q][channel])) / 255.0;
 }
 
-/* Helper function: solve a sparse linear system of equations of form Ax = b
+/* Set channel of pixel p in dest to value v in range [0-1] */
+inline void setPixel(Im &dest, int p, double v, int channel) {
+  // Clamp
+  v *= 255.0;
+  if (v > 255) {
+    v = 255;
+  } else if (v < 0){
+    v = 0;
+  }
+
+  dest[p][channel] = (unsigned char) v;
+  return;
+}
+
+/* Solve a sparse linear system of equations of form Ax = b.
  * Code sourced from docs: https://www.gnu.org/software/gsl/doc/html/splinalg.html
  */
 inline int solve(gsl_spmatrix *A, gsl_vector *x, gsl_vector *b, int OMEGA_SIZE)
@@ -151,25 +170,174 @@ inline int solve(gsl_spmatrix *A, gsl_vector *x, gsl_vector *b, int OMEGA_SIZE)
   return status;
 }
 
-/* Helper function: set channel of pixel p in dest to value v */
-inline void setPixel(Im* dest, int p, double v, int channel) {
-  // Clamp
-  v *= 255.0;
-  if (v > 255) {
-    v = 255;
-  } else if (v < 0){
-    v = 0;
-  }
+/*******************************************************************************
+Poisson Seamless Cloning
+*******************************************************************************/
 
-  (*dest)[p][channel] = (unsigned char) v;
-  return;
+// Implements poisson seamless cloning
+inline int poisson_clone(Im &src, Im dest, Im &mask, const char* outfilename)
+{
+    // Number of pixels in dest and mask
+    int W = dest.w();
+    int H = dest.h();
+    int N = W*H;
+
+    printf("Poisson cloning...\n");
+
+    /* Map pixel indices to Omega membership, given by ID <id>. An ID of -1 implies
+    *  the pixel lies outside a mask (it may still be a boundary pixel though) */
+    ::std::vector<int> toOmega (N, -1);
+    int id = 0;
+    for (int i = N - 1; i >= 0; i--) {
+      if (isWhite(mask[i])) {
+        toOmega[i] = id;
+        id++;
+      }
+    }
+
+    /* Now reverse the mapping now that we know how many ids we have */
+    int OMEGA_SIZE = id;
+    ::std::vector<int> toMask (OMEGA_SIZE);
+    for (int i = N - 1; i >= 0; i--) {
+      if (toOmega[i] >= 0) {
+        toMask[toOmega[i]] = i;
+      }
+    }
+
+    /* Initialize system of equations */
+    printf("Setting up system of equations...\n");
+    // RHS
+    gsl_vector *r = gsl_vector_alloc(OMEGA_SIZE);  /* vector of "known reds" */
+    gsl_vector *g = gsl_vector_alloc(OMEGA_SIZE);  /* vector of "known greens" */
+    gsl_vector *b = gsl_vector_alloc(OMEGA_SIZE);  /* vector of "known blues" */
+
+    /* Sparse matrix of coefficients (LHS) */
+    gsl_spmatrix *A = gsl_spmatrix_alloc(OMEGA_SIZE, OMEGA_SIZE);
+    gsl_spmatrix *C;                               /* compressed format */
+    gsl_vector *x = gsl_vector_alloc(OMEGA_SIZE);  /* vector for solutions (LHS) */
+
+    /* Iterate through the pixels in Omega... */
+    for (int id = OMEGA_SIZE - 1; id >= 0; id--) {
+      int p = toMask[id]; // Pixel index in dest and mask
+      int Np = 0;         // Number of cardinal neighbors in image
+      double r_val = 0.0; // RHS of equation
+      double g_val = 0.0; // RHS of equation
+      double b_val = 0.0; // RHS of equation
+
+      std::vector< std::vector<int> > neighbors = getNeighbors(p, W, H, toOmega);
+
+      // For each neighbor q....
+      for (int j = 0; j < 4; j++) {
+        int status = neighbors[j][0];
+        int q = neighbors[j][1];
+
+        // Ignore pixels outside the image
+        if (status == -1) {
+          continue;
+        }
+
+        Np++; // Count the neighbor
+        r_val += guidance(src, p, q, 0); // Guidance constraint
+        g_val += guidance(src, p, q, 1); // Guidance constraint
+        b_val += guidance(src, p, q, 2); // Guidance constraint
+
+        // For q in Omega
+        if (status == 1) {
+          // -fq component
+          int q_id = toOmega[q];
+          gsl_spmatrix_set(A, id, q_id, -1.0);
+        }
+        // For q in boundary of Omega
+        if (status == 0) {
+          // f* boundary constraint
+          r_val += (double) dest[q][0]/255.0;
+          g_val += (double) dest[q][1]/255.0;
+          b_val += (double) dest[q][2]/255.0;
+        }
+      }
+
+      // Np*fp component
+      gsl_spmatrix_set(A, id, id, (double) Np);
+      // Record constraints
+      gsl_vector_set(r, id, r_val);
+      gsl_vector_set(g, id, g_val);
+      gsl_vector_set(b, id, b_val);
+    }
+
+    /* convert to compressed column format */
+    C = gsl_spmatrix_ccs(A);
+
+    /* Sparsely solve the systems of equations for each channel */
+    for (int c = 0; c < 3; c++) {
+      printf("Solving for channel %d\n", c);
+      if (c == 0) solve(C, x, r, OMEGA_SIZE);
+      else if (c == 1) solve(C, x, g, OMEGA_SIZE);
+      else if (c == 2) solve(C, x, b, OMEGA_SIZE);
+
+      /* Copy into dest */
+      for (int j = OMEGA_SIZE - 1; j >= 0; j--) {
+        setPixel(dest, toMask[j], gsl_vector_get(x, j), c);
+      }
+    }
+
+    /* Free mem */
+    gsl_spmatrix_free(A);
+    gsl_spmatrix_free(C);
+    gsl_vector_free(x);
+    gsl_vector_free(r);
+    gsl_vector_free(g);
+    gsl_vector_free(b);
+
+  	/* Write image back out */
+  	if (!dest.write(outfilename))
+  		return 1;
+
+  	return 0;
 }
+
+/*******************************************************************************
+Direct Cloning
+*******************************************************************************/
+
+// Implements direct [seamed] cloning
+inline int direct_clone(Im &src, Im dest, Im &mask, const char* outfilename)
+{
+    // Number of pixels in dest and mask
+    int W = dest.w();
+    int H = dest.h();
+
+    printf("Direct cloning...\n");
+
+    /* Clone masked region from src to dest */
+  	for (int y = H - 1; y >= 0; y--) {
+  		for (int x = W - 1; x >= 0; x--) {
+        // Copy src onto dest if mask is white
+  			if (isWhite(mask(x, y))) {
+          Color &src_pixel = src(x, y);
+          Color &dest_pixel = dest(x, y);
+
+    			for (int j = 0; j < 3; j++)
+    				dest_pixel[j] = (unsigned char) src_pixel[j];
+        }
+      }
+  	}
+
+  	/* Write image back out */
+  	if (!dest.write(outfilename))
+  		return 1;
+
+  	return 0;
+}
+
+/*******************************************************************************
+Main
+*******************************************************************************/
 
 /* Main function */
 int main(int argc, char *argv[])
 {
 	if (argc < 5) {
-		fprintf(stderr, "Usage: %s src.png dest.png mask.png out.png\n", argv[0]);
+		fprintf(stderr, "Usage: %s src.png dest.png mask.png poisson_out.png [(-d | -direct) flag_mode_out.png]\n", argv[0]);
 		exit(1);
 	}
 	const char *srcfilename = argv[1];
@@ -200,118 +368,19 @@ int main(int argc, char *argv[])
 		exit(1);
   }
 
-  // Number of pixels in dest and mask
-  int W = dest.w();
-  int H = dest.h();
-  int N = W*H;
+  // Apply Poisson seamless cloning
+  int error = poisson_clone(src, dest, mask, outfilename);
+  if (error) exit(1);
 
-  /* Map pixel indices to Omega membership, given by ID <id>. An ID of -1 implies
-  *  the pixel lies outside a mask (it may still be a boundary pixel though) */
-  ::std::vector<int> toOmega (N, -1);
-  int id = 0;
-  for (int i = N - 1; i >= 0; i--) {
-    if (isWhite(mask[i])) {
-      toOmega[i] = id;
-      id++;
-    }
+
+  // Apply direct cloning if necessary
+  std::string flag_short = "-d";
+  std::string flag_long = "-direct";
+  if (argc == 7 && (flag_short.compare(argv[5]) == 0 || flag_long.compare(argv[5]) == 0)) {
+    error = direct_clone(src, dest, mask, argv[6]);
+    if (error) exit(1);
   }
 
-  /* Now reverse the mapping now that we know how many ids we have */
-  int OMEGA_SIZE = id;
-  ::std::vector<int> toMask (OMEGA_SIZE);
-  for (int i = N - 1; i >= 0; i--) {
-    if (toOmega[i] >= 0) {
-      toMask[toOmega[i]] = i;
-    }
-  }
 
-  /* Initialize system of equations */
-  printf("Setting up system of equations...\n");
-  // RHS
-  gsl_vector *r = gsl_vector_alloc(OMEGA_SIZE);  /* vector of "known reds" */
-  gsl_vector *g = gsl_vector_alloc(OMEGA_SIZE);  /* vector of "known greens" */
-  gsl_vector *b = gsl_vector_alloc(OMEGA_SIZE);  /* vector of "known blues" */
-
-  /* Sparse matrix of coefficients (LHS) */
-  gsl_spmatrix *A = gsl_spmatrix_alloc(OMEGA_SIZE, OMEGA_SIZE);
-  gsl_spmatrix *C;                               /* compressed format */
-  gsl_vector *x = gsl_vector_alloc(OMEGA_SIZE);  /* vector for solutions (LHS) */
-
-  /* Iterate through the pixels in Omega... */
-  for (int id = OMEGA_SIZE - 1; id >= 0; id--) {
-    int p = toMask[id]; // Pixel index in dest and mask
-    int Np = 0;         // Number of cardinal neighbors in image
-    double r_val = 0.0; // RHS of equation
-    double g_val = 0.0; // RHS of equation
-    double b_val = 0.0; // RHS of equation
-
-    std::vector< std::vector<int> > neighbors = getNeighbors(p, W, H, &toOmega);
-
-    // For each neighbor q....
-    for (int j = 0; j < 4; j++) {
-      int status = neighbors[j][0];
-      int q = neighbors[j][1];
-
-      // Ignore pixels outside the image
-      if (status == -1) {
-        continue;
-      }
-
-      Np++; // Count the neighbor
-      r_val += guidance(&src, p, q, 0); // Guidance constraint
-      g_val += guidance(&src, p, q, 1); // Guidance constraint
-      b_val += guidance(&src, p, q, 2); // Guidance constraint
-
-      // For q in Omega
-      if (status == 1) {
-        // -fq component
-        int q_id = toOmega[q];
-        gsl_spmatrix_set(A, id, q_id, -1.0);
-      }
-      // For q in boundary of Omega
-      if (status == 0) {
-        // f* boundary constraint
-        r_val += (double) dest[q][0]/255.0;
-        g_val += (double) dest[q][1]/255.0;
-        b_val += (double) dest[q][2]/255.0;
-      }
-    }
-
-    // Np*fp component
-    gsl_spmatrix_set(A, id, id, (double) Np);
-    // Record constraints
-    gsl_vector_set(r, id, r_val);
-    gsl_vector_set(g, id, g_val);
-    gsl_vector_set(b, id, b_val);
-  }
-
-  /* convert to compressed column format */
-  C = gsl_spmatrix_ccs(A);
-
-  /* Sparsely solve the systems of equations for each channel */
-  for (int c = 0; c < 3; c++) {
-    printf("Solving for channel %d\n", c);
-    if (c == 0) solve(C, x, r, OMEGA_SIZE);
-    else if (c == 1) solve(C, x, g, OMEGA_SIZE);
-    else if (c == 2) solve(C, x, b, OMEGA_SIZE);
-
-    /* Copy into dest */
-    for (int j = OMEGA_SIZE - 1; j >= 0; j--) {
-      setPixel(&dest, toMask[j], gsl_vector_get(x, j), c);
-    }
-  }
-
-  /* Free mem */
-  gsl_spmatrix_free(A);
-  gsl_spmatrix_free(C);
-  gsl_vector_free(x);
-  gsl_vector_free(r);
-  gsl_vector_free(g);
-  gsl_vector_free(b);
-
-	/* Write image back out */
-	if (!dest.write(outfilename))
-		exit(1);
-
-	exit(0);
+  exit(0);
 }
