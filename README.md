@@ -19,6 +19,7 @@ Usage: `$./poisson_clone src.png mask.png dest.png out.png xOffset yOffset [flag
     * no flag or unrecognized flag => seamless poisson cloning
     * "-d" or "-direct" => direct cloning
     * "-mono" or "-monochrome" => convert src to monochrome before applying poisson cloning
+    * "-mx" or "-mixed" => use mixed cloning (mix gradients of dest and src)
 
 Tip: To line up the offsets of your source image within the mask, run with the
     direct cloning flag ("-d" or "-direct") enabled. Then, once you know the
