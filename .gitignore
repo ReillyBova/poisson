@@ -30,4 +30,4 @@
 *.exe
 *.out
 *.app
-./poisson_clone
+poisson_clone
