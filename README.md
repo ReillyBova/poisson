@@ -1,7 +1,7 @@
 # poisson
 A C++ program that implements Poisson image-composition as described by Perez et al. in 2003
 
-Installation: $ make
+Installation: `$ make`
 
 Dependancies: gsl, libjpeg, libpng, and gsl (recommended: use homebrew to install)
 
