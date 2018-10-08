@@ -114,7 +114,7 @@ inline std::vector< std::vector<int> > getNeighbors(int p, int w, int h, ::std::
  */
 inline double guidance(Im* src, int p, int q, int channel)
 {
-  return (((double) (*src)[p][channel]) - ((double) (*src)[q][channel]));
+  return (((double) (*src)[p][channel]) - ((double) (*src)[q][channel])) / 255.0;
 }
 
 /* Helper function: solve a sparse linear system of equations of form Ax = b
@@ -138,8 +138,10 @@ inline int solve(gsl_spmatrix *A, gsl_vector *x, gsl_vector *b, int OMEGA_SIZE)
     status = gsl_splinalg_itersolve_iterate(A, b, tol, x, work);
 
     /* print out residual norm ||A*x - b|| */
-    //residual = gsl_splinalg_itersolve_normr(work);
-    //fprintf(stderr, "iter %zu residual = %.12e\n", iter, residual);
+    if (iter % 100 == 0) {
+      residual = gsl_splinalg_itersolve_normr(work);
+      fprintf(stderr, "iter %zu residual = %.12e\n", iter, residual);
+    }
 
     if (status == GSL_SUCCESS)
       fprintf(stderr, "Converged\n");
@@ -152,6 +154,7 @@ inline int solve(gsl_spmatrix *A, gsl_vector *x, gsl_vector *b, int OMEGA_SIZE)
 /* Helper function: set channel of pixel p in dest to value v */
 inline void setPixel(Im* dest, int p, double v, int channel) {
   // Clamp
+  v *= 255.0;
   if (v > 255) {
     v = 255;
   } else if (v < 0){
@@ -223,6 +226,7 @@ int main(int argc, char *argv[])
   }
 
   /* Initialize system of equations */
+  printf("Setting up system of equations...\n");
   // RHS
   gsl_vector *r = gsl_vector_alloc(OMEGA_SIZE);  /* vector of "known reds" */
   gsl_vector *g = gsl_vector_alloc(OMEGA_SIZE);  /* vector of "known greens" */
@@ -230,6 +234,7 @@ int main(int argc, char *argv[])
 
   /* Sparse matrix of coefficients (LHS) */
   gsl_spmatrix *A = gsl_spmatrix_alloc(OMEGA_SIZE, OMEGA_SIZE);
+  gsl_spmatrix *C;                               /* compressed format */
   gsl_vector *x = gsl_vector_alloc(OMEGA_SIZE);  /* vector for solutions (LHS) */
 
   /* Iterate through the pixels in Omega... */
@@ -266,9 +271,9 @@ int main(int argc, char *argv[])
       // For q in boundary of Omega
       if (status == 0) {
         // f* boundary constraint
-        r_val += (double) dest[q][0];
-        g_val += (double) dest[q][1];
-        b_val += (double) dest[q][2];
+        r_val += (double) dest[q][0]/255.0;
+        g_val += (double) dest[q][1]/255.0;
+        b_val += (double) dest[q][2]/255.0;
       }
     }
 
@@ -280,11 +285,15 @@ int main(int argc, char *argv[])
     gsl_vector_set(b, id, b_val);
   }
 
+  /* convert to compressed column format */
+  C = gsl_spmatrix_ccs(A);
+
   /* Sparsely solve the systems of equations for each channel */
   for (int c = 0; c < 3; c++) {
-    if (c == 0) solve(A, x, r, OMEGA_SIZE);
-    else if (c == 1) solve(A, x, g, OMEGA_SIZE);
-    else if (c == 2) solve(A, x, b, OMEGA_SIZE);
+    printf("Solving for channel %d\n", c);
+    if (c == 0) solve(C, x, r, OMEGA_SIZE);
+    else if (c == 1) solve(C, x, g, OMEGA_SIZE);
+    else if (c == 2) solve(C, x, b, OMEGA_SIZE);
 
     /* Copy into dest */
     for (int j = OMEGA_SIZE - 1; j >= 0; j--) {
@@ -294,6 +303,7 @@ int main(int argc, char *argv[])
 
   /* Free mem */
   gsl_spmatrix_free(A);
+  gsl_spmatrix_free(C);
   gsl_vector_free(x);
   gsl_vector_free(r);
   gsl_vector_free(g);
