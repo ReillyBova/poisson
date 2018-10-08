@@ -7,6 +7,7 @@ Dependancies: gsl, libjpeg, libpng, and gsl (recommended: use homebrew to instal
 
 Usage: '$./poisson_clone src.png mask.png dest.png out.png xOffset yOffset [(-d || -direct)]'
     ./poisson_clone is run with the following arguments: the following arguments:
+    
       * src.png => file path to source image (required)
       * mask.png => file path to mask image (required)
       * dest.png => file path to dest image; must be of same dim as mask.png (required)
