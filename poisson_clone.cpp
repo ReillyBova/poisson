@@ -4,7 +4,7 @@ COS 526: Assignment 1
 
 poisson_clone.cpp
 Clones src into dest based on mask using seamless Poisson cloning as described
-in Perez et al. in 2004
+in Perez et al. in 2003
 */
 
 #include <cmath>
@@ -117,11 +117,12 @@ inline std::vector< std::vector<int> > getNeighbors(int p, int w, int h, ::std::
 * Rmk: computed as g(p) - g(q)
 * NB: Does not check boundaries
 */
-inline double guidance(Im &src, int p, int q, int xOff, int yOff, int destW, int channel)
+inline double guidance(Im &src, Im &dest, int p, int q, int xOff, int yOff, int channel, int mode)
 {
   // Take into account offsets; set gradient to 0 if either pixel goes outside!
   int W = src.w();
   int H = src.h();
+  int destW = dest.w();
 
   // Coords in Dest
   int px = p % destW;
@@ -219,7 +220,7 @@ Poisson Seamless Cloning
 *******************************************************************************/
 
 // Implements poisson seamless cloning
-inline int poisson_clone(Im &src, Im &mask, Im dest, int xOff, int yOff, const char* outfilename)
+inline int poisson_clone(Im &src, Im &mask, Im dest, int xOff, int yOff, const char* outfilename, int mode)
 {
   // Number of pixels in dest and mask
   int W = dest.w();
@@ -281,9 +282,9 @@ inline int poisson_clone(Im &src, Im &mask, Im dest, int xOff, int yOff, const c
       }
 
       Np++; // Count the neighbor
-      r_val += guidance(src, p, q, xOff, yOff, W, 0); // Guidance constraint
-      g_val += guidance(src, p, q, xOff, yOff, W, 1); // Guidance constraint
-      b_val += guidance(src, p, q, xOff, yOff, W, 2); // Guidance constraint
+      r_val += guidance(src, p, q, xOff, yOff, W, 0, mode); // Guidance constraint
+      g_val += guidance(src, p, q, xOff, yOff, W, 1, mode); // Guidance constraint
+      b_val += guidance(src, p, q, xOff, yOff, W, 2, mode); // Guidance constraint
 
       // For q in Omega
       if (status == 1) {
@@ -397,6 +398,7 @@ Main
 * $ ./poisson_clone ./test_images/perez-fig3b-src1-orig.png ./test_images/perez-fig3b-mask1.png ./test_images/perez-fig3b-dst.png out.png 33 24
 * $ ./poisson_clone ./test_images/perez-fig3b-src2-orig.png ./test_images/perez-fig3b-mask2.png ./out.png out.png 20 110
 * $ ./poisson_clone ./test_images/perez-fig3b-src2-orig.png ./test_images/perez-fig3b-mask3.png ./out.png out.png -67 98
+* $ nice -20 ./poisson_clone ./test_images/perez-fig5-src.png ./test_images/perez-fig5-mask.png ./test_images/perez-fig5-dst.png ./results/fig5_mono.png -40 52 -mono
 */
 int main(int argc, char *argv[])
 {
@@ -449,11 +451,11 @@ int main(int argc, char *argv[])
   } else if (argc == 8 && (mono_short.compare(argv[7]) == 0 || mono_long.compare(argv[7]) == 0)) {
     // Convert src to monochrome and then apply poisson cloning
     src = imToMonochrome(src);
-    int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename);
+    int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename, 0);
     if (error) exit(1);
   } else {
     // Apply Poisson seamless cloning
-    int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename);
+    int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename, 0);
     if (error) exit(1);
   }
 
