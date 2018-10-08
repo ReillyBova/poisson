@@ -6,6 +6,7 @@ Installation: $ make
 Dependancies: gsl, libjpeg, libpng, and gsl (recommended: use homebrew to install)
 
 Usage: '$./poisson_clone src.png mask.png dest.png out.png xOffset yOffset [(-d || -direct)]'
+    
     ./poisson_clone is run with the following arguments: the following arguments:
     
       * src.png => file path to source image (required)
