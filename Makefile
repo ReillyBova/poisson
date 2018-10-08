@@ -1,4 +1,4 @@
-CPPFLAGS = -O
+CPPFLAGS = -O2
 LDLIBS = -lm -ljpeg -lpng -lgsl -lgslcblas
 
 all: poisson_clone
