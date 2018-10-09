@@ -139,6 +139,7 @@ Sometimes there is detail in the target region of the destination that needs to 
 | ![Source](/test_images/perez-fig7-src.png?raw=true) | ![Destination](/test_images/perez-fig7-dst.png?raw=true) |![Poisson Cloning](/results/fig7_poisson.png?raw=true) | ![Mixed Cloning](/results/fig7_mixed.png?raw=true) |
 | ![Source](/test_images/perez-fig8-src.png?raw=true) | ![Destination](/test_images/perez-fig8-dst.png?raw=true) |![Poisson Cloning](/results/fig8_poisson.png?raw=true) | ![Mixed Cloning](/results/fig8_mixed.png?raw=true) |
 
+
 ### Image Flattening
 #### Usage
 Image flattening requires the `-f` or `-flat` flag along with `threshold` and `factor` values. It is recommended that the source and destination arguments point to the same image, and that the offsets are set to `0`:
@@ -160,6 +161,50 @@ Image flattening throws away gradients in the source that do not exceed the thre
 |:--------------:|:----------------:|
 | ![Source](/test_images/perez-fig9-src.png?raw=true) | ![Flat](/results/fig9_flat.png?raw=true) |
 
+
+### Local Illumination Changes
+#### Usage
+Local illumination requires the `-il` or `-illumination` flag along with `alpha` and `beta` values. It is recommended that the source and destination arguments point to the same image, and that the offsets are set to `0`:
+
+```
+$ ./poisson_clone src.png mask.png src.png out.png 0 0 -il alpha beta
+```
+or
+```
+$ ./poisson_clone src.png mask.png src.png out.png 0 0 -illumination alpha beta
+```
+
+#### Explanation
+Nonlinear expansion and compression of the source image gradient (applied through alpha and beta) can be used to fix locally underexposed (e.g. shadows) and overexposed (e.g. specular highlights) areas in images. It is recommended that `alpha` is set to a value in the vicinity of `0.2` times the average gradient of the image, and that `beta` be set to a value simply within the neighborhood of `0.2`.
+
+#### Results
+
+| Source | Local Illumination |
+|:--------------:|:----------------:|
+| ![Source](/test_images/perez-fig10a-src.png?raw=true) | ![Illuminated](/results/fig10a_illum.png?raw=true) |
+| ![Source](/test_images/perez-fig10b-src.png?raw=true) | ![Illuminated](/results/fig10b_illum.png?raw=true) |
+
+
+### Background Decolorization
+#### Usage
+Background decolorization requires the `-dec` or `-decolor` flag and takes no further parameters. It is recommended that the source and destination arguments point to the same image, and that the offsets are set to `0`:
+
+```
+$ ./poisson_clone src.png mask.png src.png out.png 0 0 -dec
+```
+or
+```
+$ ./poisson_clone src.png mask.png src.png out.png 0 0 -decolor
+```
+
+#### Explanation
+If there is a particularly colorful area within an image (more specifically, that the region has a distinct color from its immediate surroundings), then if the source is poisson cloned onto a greyscale version of itself, the colorful region should still retain its color through the cloning process.
+
+#### Results
+
+| Source | Background Decolorization |
+|:--------------:|:----------------:|
+| ![Source](/test_images/perez-fig11-src.png?raw=true) | ![Illuminated](/results/fig11_dec.png?raw=true) |
 
 
 ## Authors
