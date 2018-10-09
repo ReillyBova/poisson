@@ -254,7 +254,7 @@ This is an experimental extension that was not proposed in the original 2003 pap
 ## Authors
 
 * **Reilly Bova** - *Cloning Program and Examples* - [ReillyBova](https://github.com/ReillyBova)
-* **Szymon Rusinkiewicz** - *Basic C++ and C I/O files*
+* **Szymon Rusinkiewicz** - *Basic C++ and C Image I/O files*
 
 See also the list of [contributors](https://github.com/ReillyBova/poisson/contributors) who participated in this project.
 
@@ -267,4 +267,4 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 
 ## Acknowledgments
 
-* Thank you to Professor Szymon Rusinkiewicz for teaching and assigning this brilliant technique in the Fall 2018 semester of COS 526: Advanced Computer Graphics
+Thank you to Professor Szymon Rusinkiewicz for teaching and assigning this brilliant technique in the Fall 2018 semester of COS 526: Advanced Computer Graphics
