@@ -253,7 +253,8 @@ This is an experimental extension that was not proposed in the original 2003 pap
 
 ## Authors
 
-* **Reilly Bova** - *Initial work* - [ReillyBova](https://github.com/ReillyBova)
+* **Reilly Bova** - *Cloning Program and Examples* - [ReillyBova](https://github.com/ReillyBova)
+* **Szymon Rusinkiewicz** - *Basic C++ and C I/O files*
 
 See also the list of [contributors](https://github.com/ReillyBova/poisson/contributors) who participated in this project.
 
