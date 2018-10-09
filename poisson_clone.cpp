@@ -117,7 +117,8 @@ inline std::vector< std::vector<int> > getNeighbors(int p, int w, int h, ::std::
 * Rmk: computed as g(p) - g(q)
 * NB: Does not check boundaries
 */
-inline double guidance(Im &src, Im &dest, int p, int q, int xOff, int yOff, int channel, int mode)
+inline double guidance(Im &src, Im &dest, int p, int q, int xOff, int yOff, int channel,
+                      int mode, double param1, double param2, double param3)
 {
   // Take into account offsets; set gradient to 0 if either pixel goes outside!
   int W = src.w();
@@ -153,11 +154,19 @@ inline double guidance(Im &src, Im &dest, int p, int q, int xOff, int yOff, int 
   } if (mode == 2) {
     // flat mode (lazy way... threshol :P)
     double gradg = ((double) src(pu, pv)[channel]) - ((double) src(qu, qv)[channel]);
-    if (abs(gradg) > 5) {
-      return (gradg / 255.0);
+    if (abs(gradg) > param1) {
+      return (gradg * param2 / 255.0);
     } else {
       return 0;
     }
+  } if (mode == 3) {
+    // illumination mode
+    double gradg = (((double) src(pu, pv)[channel]) - ((double) src(qu, qv)[channel])) / 255.0;
+    if (gradg == 0) {
+      // avoid NaN
+      return 0;
+    }
+    return (pow(param1, param2) * pow(abs(1.0), -1.0 * param2) * gradg);
   } else {
     // default (mode == 0 presumably)
     return (((double) src(pu, pv)[channel]) - ((double) src(qu, qv)[channel])) / 255.0;
@@ -178,6 +187,25 @@ inline void setPixel(Im &dest, int p, double v, int channel) {
   return;
 }
 
+/* Get value of source pixel cooresponding to p in dest*/
+inline double sourcePixel(Im &src, int W, int p, int xOff, int yOff, int channel)
+{
+  // Coords in Dest
+  int px = p % W;
+  int py = p / W;
+
+  // Coords in src
+  int pu = px - xOff;
+  int pv = py - yOff;
+
+  // Check boundaries
+  if (pu < 0 || pv < 0 || pu >= src.w() || pv >= src.h()) {
+    return 0;
+  } else {
+    return (src(pu, pv)[channel] / 255.0);
+  }
+}
+
 /* Solve a sparse linear system of equations of form Ax = b.
 * Code sourced from docs: https://www.gnu.org/software/gsl/doc/html/splinalg.html
 */
@@ -190,9 +218,6 @@ inline int solve(gsl_spmatrix *A, gsl_vector *x, gsl_vector *b, int OMEGA_SIZE)
   size_t iter = 0;
   double residual;
   int status;
-
-  /* initial guess x = 0 */
-  gsl_vector_set_zero(x);
 
   /* solve the system Ax = b */
   do {
@@ -212,12 +237,47 @@ inline int solve(gsl_spmatrix *A, gsl_vector *x, gsl_vector *b, int OMEGA_SIZE)
   return status;
 }
 
-/* Converts an image to monochrome using luminosity (does not overwrite im) */
-inline Im imToMonochrome(Im im)
+/* Recolors an image (deep copy) by scaling RGB values by scaleR, scaleG, and scaleB */
+/* Returns recolored image */
+inline Im imRecolor(Im im, double scaleR, double scaleG, double scaleB)
 {
   for (int y = im.h() - 1; y >= 0; y--) {
     for (int x = im.w() - 1; x >= 0; x--) {
-      // Compute monochrome value and clamp
+      for (int c = 0; c < 3; c++) {
+        // Compute recolored value
+        Color &pixel = im(x, y);
+        double value = pixel[c];
+        if (c == 0)
+          value *= scaleR;
+        else if (c == 1)
+          value *= scaleG;
+        else
+          value *= scaleB;
+
+        // Clamp
+        if (value > 255) {
+          value = 255;
+        } else if (value < 0){
+          value = 0;
+        }
+
+        // Cast and set
+        unsigned char p = (unsigned char) value;
+        pixel[c] = p;
+      }
+    }
+  }
+
+  return im;
+}
+
+/* Converts an image to monochrome using luminosity (does not overwrite im) */
+inline Im imToMonochrome(Im im)
+{
+  return imRecolor(im, 0.21, 0.72, 0.07);
+  for (int y = im.h() - 1; y >= 0; y--) {
+    for (int x = im.w() - 1; x >= 0; x--) {
+      // Compute luminance value and clamp
       Color &pixel = im(x, y);
       double mono = 0.21*pixel[0] + 0.72*pixel[1] + 0.07*pixel[2];
       if (mono > 255) {
@@ -228,7 +288,7 @@ inline Im imToMonochrome(Im im)
       // Cast and set
       unsigned char m = (unsigned char) mono;
       for (int j = 0; j < 3; j++)
-      pixel[j] = m;
+        pixel[j] = m;
     }
   }
 
@@ -240,7 +300,8 @@ Poisson Seamless Cloning
 *******************************************************************************/
 
 // Implements poisson seamless cloning
-inline int poisson_clone(Im &src, Im &mask, Im dest, int xOff, int yOff, const char* outfilename, int mode)
+inline int poisson_clone(Im &src, Im &mask, Im dest, int xOff, int yOff, const char* outfilename,
+                        int mode, double param1, double param2, double param3)
 {
   // Number of pixels in dest and mask
   int W = dest.w();
@@ -289,6 +350,7 @@ inline int poisson_clone(Im &src, Im &mask, Im dest, int xOff, int yOff, const c
     double g_val = 0.0; // RHS of equation
     double b_val = 0.0; // RHS of equation
 
+    // Fetch neighbors
     std::vector< std::vector<int> > neighbors = getNeighbors(p, W, H, toOmega);
 
     // For each neighbor q....
@@ -302,9 +364,10 @@ inline int poisson_clone(Im &src, Im &mask, Im dest, int xOff, int yOff, const c
       }
 
       Np++; // Count the neighbor
-      r_val += guidance(src, dest, p, q, xOff, yOff, 0, mode); // Guidance constraint
-      g_val += guidance(src, dest, p, q, xOff, yOff, 1, mode); // Guidance constraint
-      b_val += guidance(src, dest, p, q, xOff, yOff, 2, mode); // Guidance constraint
+      // Guidance constraints
+      r_val += guidance(src, dest, p, q, xOff, yOff, 0, mode, param1, param2, param3);
+      g_val += guidance(src, dest, p, q, xOff, yOff, 1, mode, param1, param2, param3);
+      b_val += guidance(src, dest, p, q, xOff, yOff, 2, mode, param1, param2, param3);
 
       // For q in Omega
       if (status == 1) {
@@ -334,6 +397,12 @@ inline int poisson_clone(Im &src, Im &mask, Im dest, int xOff, int yOff, const c
 
   /* Sparsely solve the systems of equations for each channel */
   for (int c = 0; c < 3; c++) {
+    /* Init solutions to src for the first channel; then use prev channel for speedup */
+    for (int id = OMEGA_SIZE - 1; id >= 0; id--) {
+      double val = sourcePixel(src, W, toMask[id], xOff, yOff, c);
+      gsl_vector_set(x, id, val);
+    }
+
     printf("Solving for channel %d\n", c);
     if (c == 0) solve(C, x, r, OMEGA_SIZE);
     else if (c == 1) solve(C, x, g, OMEGA_SIZE);
@@ -411,7 +480,7 @@ Main
 
 /* Main function sample usage:
 * $ ./poisson_clone ./test_images/perez-fig4a-src.png ./test_images/perez-fig4a-mask.png ./test_images/perez-fig4a-dst.png 0 0 direct.png -direct
-* $ ./poisson_clone ./test_images/perez-fig4a-src-orig.png ./test_images/perez-fig4a-mask.png ./test_images/perez-fig4a-dst.png out.png-11 52
+* $ ./poisson_clone ./test_images/perez-fig4a-src-orig.png ./test_images/perez-fig4a-mask.png ./test_images/perez-fig4a-dst.png out.png -11 52
 *
 * $ ./poisson_clone ./test_images/perez-fig3a-src-orig.png ./test_images/perez-fig3a-mask.png ./test_images/perez-fig3a-dst.png out.png -33 -33
 *
@@ -421,12 +490,20 @@ Main
 * $ nice -20 ./poisson_clone ./test_images/perez-fig5-src.png ./test_images/perez-fig5-mask.png ./test_images/perez-fig5-dst.png ./results/fig5_mono.png -40 52 -mono
 * $ nice -20 ./poisson_clone ./test_images/perez-fig6-src.png ./test_images/perez-fig6-mask.png ./test_images/perez-fig6-dst.png ./results/fig6_mixed.png 25 20 -mx
 *
-* $ $ ./poisson_clone ./custom_images/eisg.png ./custom_images/wash-mask.jpg ./custom_images/wash.jpg out.png 486 300
+* $ nice -20 ./poisson_clone ./test_images/perez-fig9-src.png ./test_images/perez-fig9-mask.png ./test_images/perez-fig9-src.png ./results/fig9_flat.png 0 0 -f 5 .95
+*
+* $ nice -20 ./poisson_clone ./test_images/perez-fig10a-src.png ./test_images/perez-fig10a-mask.png ./test_images/perez-fig10a-src.png ./results/fig10a_illum.png 0 0 -il .2 .2
+*
+* $ ./poisson_clone ./custom_images/eisg.png ./custom_images/wash-mask.jpg ./custom_images/wash.jpg out.png 486 300
 */
 int main(int argc, char *argv[])
 {
   if (argc < 7) {
-    fprintf(stderr, "Usage: %s src.png mask.png dest.png out.png xOffset yOffset [(-d || -direct) || (-mono || -monochrome) || (-mx || -mixed)]\n", argv[0]);
+    fprintf(stderr, "Usage: %s src.png mask.png dest.png out.png xOffset yOffset [-FLAG]\n", argv[0]);
+    fprintf(stderr, "Valid Flags:\n   * (-d || -direct)\n   * (-mono || -monochrome)\n   * ");
+    fprintf(stderr, "(-mx || -mixed)\n   * ((-f || -flat) threshold factor)\n   * ");
+    fprintf(stderr, "((-il || -illumination) alpha beta)\n   * (-dec || -decolor)\n   * ");
+    fprintf(stderr, "((-rec || -recolor) scaleR scaleG scaleB\n");
     exit(1);
   }
   const char *srcfilename = argv[1];
@@ -435,6 +512,10 @@ int main(int argc, char *argv[])
   const char *outfilename = argv[4];
   const int xOff = atoi(argv[5]);
   const int yOff = atoi(argv[6]);
+
+  double extra1;
+  double extra2;
+  double extra3;
 
   /* Read the src image */
   Im src;
@@ -468,6 +549,12 @@ int main(int argc, char *argv[])
   std::string mx_long = "-mixed";
   std::string f_short = "-f";
   std::string f_long = "-flat";
+  std::string il_short = "-il";
+  std::string il_long = "-illumination";
+  std::string dec_short = "-dec";
+  std::string dec_long = "-decolor";
+  std::string rec_short = "-rec";
+  std::string rec_long = "-recolor";
 
   // Use flag to determine cloning method
   int error = 0;
@@ -478,19 +565,40 @@ int main(int argc, char *argv[])
   } else if (argc == 8 && (mono_short.compare(argv[7]) == 0 || mono_long.compare(argv[7]) == 0)) {
     // Convert src to monochrome and then apply poisson cloning
     src = imToMonochrome(src);
-    int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename, 0);
+    int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename, 0, extra1, extra2, extra3);
     if (error) exit(1);
   } else if (argc == 8 && (mx_short.compare(argv[7]) == 0 || mx_long.compare(argv[7]) == 0)) {
     // Apply poisson cloning in mixed mode
-    int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename, 1);
+    int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename, 1, extra1, extra2, extra3);
     if (error) exit(1);
-  } else if (argc == 8 && (f_short.compare(argv[7]) == 0 || f_long.compare(argv[7]) == 0)) {
+  } else if (argc == 10 && (f_short.compare(argv[7]) == 0 || f_long.compare(argv[7]) == 0)) {
     // Apply poisson cloning in flatten mode (only keep high gradients)
-    int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename, 2);
+    extra1 = atof(argv[8]);
+    extra2 = atof(argv[9]);
+    int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename, 2, extra1, extra2, extra3);
+    if (error) exit(1);
+  } else if (argc == 10 && (il_short.compare(argv[7]) == 0 || il_long.compare(argv[7]) == 0)) {
+    // Apply poisson cloning in flatten mode (only keep high gradients)
+    extra1 = atof(argv[8]);
+    extra2 = atof(argv[9]);
+    int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename, 3, extra1, extra2, extra3);
+    if (error) exit(1);
+  } else if (argc == 8 && (dec_short.compare(argv[7]) == 0 || dec_long.compare(argv[7]) == 0)) {
+    // Convert dest to monochrome and then apply poisson cloning
+    dest = imToMonochrome(dest);
+    int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename, 0, extra1, extra2, extra3);
+    if (error) exit(1);
+  } else if (argc == 11 && (rec_short.compare(argv[7]) == 0 || rec_long.compare(argv[7]) == 0)) {
+    // Recolor souce and then apply poisson image blending
+    extra1 = atof(argv[8]);
+    extra2 = atof(argv[9]);
+    extra3 = atof(argv[9]);
+    src = imRecolor(src, extra1, extra2, extra3);
+    int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename, 0, extra1, extra2, extra3);
     if (error) exit(1);
   } else {
     // Apply Poisson seamless cloning
-    int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename, 0);
+    int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename, 0, extra1, extra2, extra3);
     if (error) exit(1);
   }
 
