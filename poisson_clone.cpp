@@ -283,7 +283,6 @@ inline Im imRecolor(Im im, double scaleR, double scaleG, double scaleB)
 /* Converts an image to monochrome using luminosity (does not overwrite im) */
 inline Im imToMonochrome(Im im)
 {
-  return imRecolor(im, 0.21, 0.72, 0.07);
   for (int y = im.h() - 1; y >= 0; y--) {
     for (int x = im.w() - 1; x >= 0; x--) {
       // Compute luminance value and clamp
