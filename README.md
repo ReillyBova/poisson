@@ -253,9 +253,12 @@ This is an experimental extension that was not proposed in the original 2003 pap
 
 ## Authors
 
-* **Billie Thompson** - *Initial work* - [PurpleBooth](https://github.com/PurpleBooth)
+* **Reilly Bova** - *Initial work* - [ReillyBova](https://github.com/ReillyBova)
 
-See also the list of [contributors](https://github.com/your/project/contributors) who participated in this project.
+See also the list of [contributors](https://github.com/ReillyBova/poisson/contributors) who participated in this project.
+
+## References
+[1] Pérez, Patrick, Michel Gangnet, and Andrew Blake. "Poisson image editing." ACM Transactions on Graphics (TOG). Vol. 22. No. 3. ACM, 2003.
 
 ## License
 
@@ -263,35 +266,4 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 
 ## Acknowledgments
 
-* Hat tip to anyone whose code was used
-* Inspiration
-* etc
-
-
-
-# poisson
-A C++ program that implements Poisson image-composition as described by Perez et al. in 2003
-
-Installation: `$ make`
-
-Dependancies: gsl, libjpeg, libpng, and gsl (recommended: use homebrew to install)
-
-Usage: `$./poisson_clone src.png mask.png dest.png out.png xOffset yOffset [flag]`
-
-./poisson_clone is run with the following arguments: the following arguments:
-
-  * src.png => file path to source image (required)
-  * mask.png => file path to mask image (required)
-  * dest.png => file path to dest image; must be of same dim as mask.png (required)
-  * out.png => file path to write result (required)
-  * xOffset => x offset in src.png (required)
-  * yOffset => y offset in src.png (required)
-  * flag argument (optional):
-    * no flag or unrecognized flag => seamless Poisson cloning
-    * "-d" or "-direct" => direct cloning
-    * "-mono" or "-monochrome" => convert src to monochrome before applying Poisson cloning
-    * "-mx" or "-mixed" => use mixed cloning (mix gradients of dest and src)
-
-Tip: To line up the offsets of your source image within the mask, run with the
-    direct cloning flag ("-d" or "-direct") enabled. Then, once you know the
-    proper offset for cloning, remove the flag to run Poisson cloning.
+* Thank you to Professor Szymon Rusinkiewicz for teaching and assigning this brilliant technique in the Fall 2018 semester of COS 526: Advanced Computer Graphics
