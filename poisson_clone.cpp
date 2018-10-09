@@ -151,7 +151,7 @@ inline double guidance(Im &src, Im &dest, int p, int q, int xOff, int yOff, int 
     } else {
       return gradg;
     }
-  } if (mode == 2) {
+  } else if (mode == 2) {
     // flat mode (lazy way... threshol :P)
     double gradg = ((double) src(pu, pv)[channel]) - ((double) src(qu, qv)[channel]);
     if (abs(gradg) > param1) {
@@ -159,7 +159,7 @@ inline double guidance(Im &src, Im &dest, int p, int q, int xOff, int yOff, int 
     } else {
       return 0;
     }
-  } if (mode == 3) {
+  } else if (mode == 3) {
     // illumination mode
     double gradg = (((double) src(pu, pv)[channel]) - ((double) src(qu, qv)[channel])) / 255.0;
     if (gradg == 0) {
@@ -167,6 +167,15 @@ inline double guidance(Im &src, Im &dest, int p, int q, int xOff, int yOff, int 
       return 0;
     }
     return (pow(param1, param2) * pow(abs(1.0), -1.0 * param2) * gradg);
+  } else if (mode == 4) {
+    // texture mode (not perfect -> leads to discoloration and only adds more grain)
+    double gradg = (((double) src(pu, pv)[channel]) - ((double) src(qu, qv)[channel]));
+    double gradf = (((double) dest[p][channel]) - ((double) dest[q][channel]));
+    if (abs(gradf) < param1) {
+      return ((gradf + gradg) / 255.0);
+    } else {
+      return (gradg / 255.0);
+    }
   } else {
     // default (mode == 0 presumably)
     return (((double) src(pu, pv)[channel]) - ((double) src(qu, qv)[channel])) / 255.0;
@@ -503,7 +512,7 @@ int main(int argc, char *argv[])
     fprintf(stderr, "Valid Flags:\n   * (-d || -direct)\n   * (-mono || -monochrome)\n   * ");
     fprintf(stderr, "(-mx || -mixed)\n   * ((-f || -flat) threshold factor)\n   * ");
     fprintf(stderr, "((-il || -illumination) alpha beta)\n   * (-dec || -decolor)\n   * ");
-    fprintf(stderr, "((-rec || -recolor) scaleR scaleG scaleB\n");
+    fprintf(stderr, "((-rec || -recolor) scaleR scaleG scaleB)\n   * ((-tex || -texture) threshold)\n");
     exit(1);
   }
   const char *srcfilename = argv[1];
@@ -555,6 +564,8 @@ int main(int argc, char *argv[])
   std::string dec_long = "-decolor";
   std::string rec_short = "-rec";
   std::string rec_long = "-recolor";
+  std::string tex_short = "-tex";
+  std::string tex_long = "-texture";
 
   // Use flag to determine cloning method
   int error = 0;
@@ -578,7 +589,7 @@ int main(int argc, char *argv[])
     int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename, 2, extra1, extra2, extra3);
     if (error) exit(1);
   } else if (argc == 10 && (il_short.compare(argv[7]) == 0 || il_long.compare(argv[7]) == 0)) {
-    // Apply poisson cloning in flatten mode (only keep high gradients)
+    // Apply poisson cloning with local illumination changes
     extra1 = atof(argv[8]);
     extra2 = atof(argv[9]);
     int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename, 3, extra1, extra2, extra3);
@@ -595,6 +606,11 @@ int main(int argc, char *argv[])
     extra3 = atof(argv[9]);
     src = imRecolor(src, extra1, extra2, extra3);
     int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename, 0, extra1, extra2, extra3);
+    if (error) exit(1);
+  } else if (argc == 9 && (tex_short.compare(argv[7]) == 0 || tex_long.compare(argv[7]) == 0)) {
+    // Apply poisson cloning but try to keep the grain (similar to mixed, but with threshholds)
+    extra1 = atof(argv[8]);
+    int error = poisson_clone(src, mask, dest, xOff, yOff, outfilename, 4, extra1, extra2, extra3);
     if (error) exit(1);
   } else {
     // Apply Poisson seamless cloning
