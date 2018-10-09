@@ -9,9 +9,9 @@ Follow these instructions in order to run this program on your local machine (NB
 ### Prerequisites
 
 This project requires the following libraries:
-*[GNU Science Library](https://www.gnu.org/software/gsl/)
-*[libjpeg](https://www.ijg.org/)
-*[libpng](http://www.libpng.org/pub/png/libpng.html)
+* [GNU Science Library](https://www.gnu.org/software/gsl/)
+* [libjpeg](https://www.ijg.org/)
+* [libpng](http://www.libpng.org/pub/png/libpng.html)
 
 ### Installing
 
@@ -41,18 +41,40 @@ Here is a breakdown of the meaning of the arguments and avaliable flags:
   * "-il" or "-illumination" followed by `alpha beta` => Apply exposure/specular correction using `alpha` and `beta` as parameters for applying a nonlinear transformation to the source gradient
   * "-dec" or "-decolor" => Attempt to decolor the background by converting the destination to monochrome before applying seamless Poisson cloning
   * "-rec" or "-recolor" followed by `scaleR scaleG scaleB` => Scale color source channels by the provided parameters before applying poisson cloning
+  * "-tex" or "-texture" followed by `threshold` => Preserve grain (gradient below threshold) in dest
 
-## Cloning Modes
+## Cloning Modes & Examples
 
-Explain how to run the automated tests for this system
+This section contains descriptions of each cloning mode in this program, along with examples on how to run them.
 
 ### Poisson Cloning
-
-Explain what these tests test and why
+Poisson cloning is the main workhorse of this program and is run without flags:
 
 ```
-Give an example
+$ ./poisson_clone src.png mask.png dest.png out.png xOffset yOffset [-FLAG [extraArgs]]
 ```
+
+#### Explanation
+This method of cloning solves a sparse linear system of equations of the form `Ax = b` bound by two contraints: (1) the border of the cloned region must match the border of the region before cloning, and (2) the color gradient-field within the pasted cloned-region must match the gradient-field of the source cloned-region as closely as possible.
+
+In pseudocode, the matrices and vectors for this system of equations are constructed as follows:
+```
+for each pixel i in the mask:
+  Np = 0  // "Number of neighbors"
+  for each neighbor j of i:
+    set Aij to -1 if j in mask;
+    add dest[j] to b_i if j in image but not in mask (=> j is a border pixel)
+    add 1 to Np if j is in image
+    add guidance (src[i] - src[j]) to b_i if j is in image
+  set Aii to num neighbors Np
+```
+
+#### Results
+
+|  Direct Cloning | Poisson Cloning | 
+|:--------------:|:----------------:|
+| ![Direct Cloning](/results/battleOfPrinceton_direct.png?raw=true) | ![Poisson Cloning](/results/battleOfPrinceton_poisson.png?raw=true) |
+| ![Direct Cloning](/results/fig3a_direct.png?raw=true) | ![Poisson Cloning](/results/fig3a_poisson.png?raw=true) |
 
 ### And coding style tests
 
