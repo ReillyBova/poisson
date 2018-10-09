@@ -15,11 +15,11 @@ This project requires the following libraries:
 
 ### Installing
 
-First, install the prerequisites using your favorite method (`homebrew` is recommended for Mac OSX). Then, download this repository, and run the Makefile using`$ make`. The C++ program should compile into `poisson_clone` without errors.
+First, install the prerequisites using your favorite method ([homebrew](https://brew.sh/) is recommended for Mac OSX). Then, download this repository, and run the Makefile using `$ make`. The C++ program should compile into `poisson_clone` without errors.
 
 ### Running the Program
 
-Once `poisson_clone` has been compiled, run it in the command line using the following arguments
+Once `poisson_clone` has been compiled, run it in the command line using the following arguments:
 
 ```
 $ ./poisson_clone src.png mask.png dest.png out.png xOffset yOffset [-FLAG [extraArgs]]
@@ -48,10 +48,12 @@ Here is a breakdown of the meaning of the arguments and avaliable flags:
 This section contains descriptions of each cloning mode in this program, along with examples on how to run them.
 
 ### Poisson Cloning
+
+#### Usage
 Poisson cloning is the main workhorse of this program and is run without flags:
 
 ```
-$ ./poisson_clone src.png mask.png dest.png out.png xOffset yOffset [-FLAG [extraArgs]]
+$ ./poisson_clone src.png mask.png dest.png out.png xOffset yOffset
 ```
 
 #### Explanation
@@ -75,32 +77,20 @@ for each pixel i in the mask:
 |:--------------:|:----------------:|
 | ![Direct Cloning](/results/battleOfPrinceton_direct.png?raw=true) | ![Poisson Cloning](/results/battleOfPrinceton_poisson.png?raw=true) |
 | ![Direct Cloning](/results/fig3a_direct.png?raw=true) | ![Poisson Cloning](/results/fig3a_poisson.png?raw=true) |
+| ![Direct Cloning](/results/fig3b_direct.png?raw=true) | ![Poisson Cloning](/results/fig3b_poisson.png?raw=true) |
+| ![Direct Cloning](/results/fig4_direct.png?raw=true) | ![Poisson Cloning](/results/fig4_poisson.png?raw=true) |
 
-### And coding style tests
-
-Explain what these tests test and why
+### Direct Cloning
+#### Usage
+Direct cloning is the naive (seamed) implementation of cloning and requires a `-d` or `-direct` flag:
 
 ```
-Give an example
+$ ./poisson_clone src.png mask.png dest.png out.png xOffset yOffset -d
 ```
-
-## Deployment
-
-Add additional notes about how to deploy this on a live system
-
-## Built With
-
-* [Dropwizard](http://www.dropwizard.io/1.0.2/docs/) - The web framework used
-* [Maven](https://maven.apache.org/) - Dependency Management
-* [ROME](https://rometools.github.io/rome/) - Used to generate RSS Feeds
-
-## Contributing
-
-Please read [CONTRIBUTING.md](https://gist.github.com/PurpleBooth/b24679402957c63ec426) for details on our code of conduct, and the process for submitting pull requests to us.
-
-## Versioning
-
-We use [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/your/project/tags). 
+OR
+```
+$ ./poisson_clone src.png mask.png dest.png out.png xOffset yOffset -direct
+```
 
 ## Authors
 
