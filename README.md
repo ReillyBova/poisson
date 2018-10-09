@@ -82,15 +82,61 @@ for each pixel i in the mask:
 
 ### Direct Cloning
 #### Usage
-Direct cloning is the naive (seamed) implementation of cloning and requires a `-d` or `-direct` flag:
+Direct cloning is the naive (seamed) implementation of cloning and requires a `-d` or `-direct` flag. It takes no further parameters:
 
 ```
 $ ./poisson_clone src.png mask.png dest.png out.png xOffset yOffset -d
 ```
-OR
+or
 ```
 $ ./poisson_clone src.png mask.png dest.png out.png xOffset yOffset -direct
 ```
+
+### Monochromatic Poisson Cloning
+#### Usage
+Monochromatic cloning requires the `-mono` or `-monochromatic` flag and takes no further parameters:
+
+```
+$ ./poisson_clone src.png mask.png dest.png out.png xOffset yOffset -mono
+```
+or
+```
+$ ./poisson_clone src.png mask.png dest.png out.png xOffset yOffset -monochromatic
+```
+
+#### Explanation
+First monochromatic cloning converts the source image to greyscale through luminance, and it then applies Poisson cloning on using the black and white source image. This is useful when the chromacity of the cloned region needs to remain relatively constant, as the default (polychromatic) poisson cloning will allow for changes in color within the cloned region that are somewhat independent of the destination's border constraints.
+
+#### Results
+
+| Source | Destination | Polychromatic Poisson Cloning | Monochromatic Poisson Cloning | 
+|:--------------:|:----------------:|:----------------:|:----------------:|
+| ![Source](/test_images/perez-fig5-src.png?raw=true) | ![Destination](/test_images/perez-fig5-dst.png?raw=true) |![Poisson Cloning](/results/fig5_poisson.png?raw=true) | ![Monochromatic Cloning](/results/fig5_mono.png?raw=true) |
+
+### Mixed Poisson Cloning
+#### Usage
+Mixed cloning requires the `-mx` or `-mixed` flag and takes no further parameters:
+
+```
+$ ./poisson_clone src.png mask.png dest.png out.png xOffset yOffset -mx
+```
+or
+```
+$ ./poisson_clone src.png mask.png dest.png out.png xOffset yOffset -mixed
+```
+
+#### Explanation
+Sometimes there is detail in the target region of the destination that needs to be preserved (e.g. a brick wall, or a sharp edge in the background). This is accomplished by adjusting the guidance function between two pixels (i, j) such that if the gradient between pixels i and j are greater (by magnitude) in the destitiation image than in the source, this larger gradient will be used for the system of equations
+
+#### Results
+
+| Source | Destination | Poisson Cloning | Mixed Poisson Cloning | 
+|:--------------:|:----------------:|:----------------:|:----------------:|
+| ![Source](/test_images/perez-fig6-src.png?raw=true) | ![Destination](/test_images/perez-fig6-dst.png?raw=true) |![Poisson Cloning](/results/fig6_poisson.png?raw=true) | ![Mixed Cloning](/results/fig6_mixed.png?raw=true) |
+| ![Source](/test_images/perez-fig7-src.png?raw=true) | ![Destination](/test_images/perez-fig7-dst.png?raw=true) |![Poisson Cloning](/results/fig7_poisson.png?raw=true) | ![Mixed Cloning](/results/fig7_mixed.png?raw=true) |
+| ![Source](/test_images/perez-fig8-src.png?raw=true) | ![Destination](/test_images/perez-fig8-dst.png?raw=true) |![Poisson Cloning](/results/fig8_poisson.png?raw=true) | ![Mixed Cloning](/results/fig8_mixed.png?raw=true) |
+
+
 
 ## Authors
 
