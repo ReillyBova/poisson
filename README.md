@@ -33,14 +33,14 @@ Here is a breakdown of the meaning of the arguments and avaliable flags:
 * xOffset => x offset in src.png (required)
 * yOffset => y offset in src.png (required)
 * flag argument (optional):
-  * no flag or unrecognized flag => seamless poisson cloning
+  * no flag or unrecognized flag => seamless Poisson cloning
   * "-d" or "-direct" => direct cloning
-  * "-mono" or "-monochrome" => convert src to monochrome before applying poisson cloning
+  * "-mono" or "-monochrome" => convert src to monochrome before applying Poisson cloning
   * "-mx" or "-mixed" => use mixed cloning (mix gradients of dest and src)
   * "-f" or "-flat" followed by `threshold factor` => Threshold gradients above `threshold` and scale them by `factor`
   * "-il" or "-illumination" followed by `alpha beta` => Apply exposure/specular correction using `alpha` and `beta` as parameters for applying a nonlinear transformation to the source gradient
   * "-dec" or "-decolor" => Attempt to decolor the background by converting the destination to monochrome before applying seamless Poisson cloning
-  * "-rec" or "-recolor" followed by `scaleR scaleG scaleB` => Scale color source channels by the provided parameters before applying poisson cloning
+  * "-rec" or "-recolor" followed by `scaleR scaleG scaleB` => Scale color source channels by the provided parameters before applying Poisson cloning
   * "-tex" or "-texture" followed by `threshold` => Preserve grain (gradient below threshold) in dest
 
 ## Cloning Modes & Examples
@@ -107,7 +107,7 @@ $ ./poisson_clone src.png mask.png dest.png out.png xOffset yOffset -monochrome
 ```
 
 #### Explanation
-First monochromatic cloning converts the source image to greyscale through luminance, and it then applies Poisson cloning on using the black and white source image. This is useful when the chromacity of the cloned region needs to remain relatively constant, as the default (polychromatic) poisson cloning will allow for changes in color within the cloned region that are somewhat independent of the destination's border constraints.
+First monochromatic cloning converts the source image to greyscale through luminance, and it then applies Poisson cloning on using the black and white source image. This is useful when the chromacity of the cloned region needs to remain relatively constant, as the default (polychromatic) Poisson cloning will allow for changes in color within the cloned region that are somewhat independent of the destination's border constraints.
 
 #### Results
 
@@ -198,13 +198,57 @@ $ ./poisson_clone src.png mask.png src.png out.png 0 0 -decolor
 ```
 
 #### Explanation
-If there is a particularly colorful area within an image (more specifically, that the region has a distinct color from its immediate surroundings), then if the source is poisson cloned onto a greyscale version of itself, the colorful region should still retain its color through the cloning process.
+If there is a particularly colorful area within an image (more specifically, that the region has a distinct color from its immediate surroundings), then if the source is Poisson-cloned onto a greyscale version of itself, the colorful region should still retain its color through the cloning process.
 
 #### Results
 
 | Source | Background Decolorization |
 |:--------------:|:----------------:|
-| ![Source](/test_images/perez-fig11-src.png?raw=true) | ![Illuminated](/results/fig11_dec.png?raw=true) |
+| ![Source](/test_images/perez-fig11-src.png?raw=true) | ![Decolorization](/results/fig11_dec.png?raw=true) |
+
+
+### Local Recolorization
+#### Usage
+Local recolorization requires the `-rec` or `-recolor` flag as well as three additional parameters that coorespond to the scaling of RGB in recolorization. It is recommended that the source and destination arguments point to the same image, and that the offsets are set to `0`:
+
+```
+$ ./poisson_clone src.png mask.png src.png out.png 0 0 -rec scaleR scaleG scaleB
+```
+or
+```
+$ ./poisson_clone src.png mask.png src.png out.png 0 0 -recolor scaleR scaleG scaleB
+```
+
+#### Explanation
+Recoloring works by scaling RGB values in the source image by the specified amounts before applying Poisson cloning. The bordering region around the object of interest in the mask will return to its original color when the boundary constraints of the cloning process are applied, the but object of interest itself will retain its new color.
+
+#### Results
+
+| Source | Background Local Recolorization |
+|:--------------:|:----------------:|
+| ![Source](/test_images/perez-fig11-src.png?raw=true) | ![Recolorization](/results/fig11_rec.png?raw=true) |
+
+
+### Texture Preserving Poisson Cloning
+#### Usage
+Texture preserving poisson cloning requires the `-tex` or `-texture` flag as well as one addition `threshold` argument:
+
+```
+$ ./poisson_clone src.png mask.png src.png out.png xOffset yOffset -tex threshold
+```
+or
+```
+$ ./poisson_clone src.png mask.png src.png out.png xOffset yOffset -texture threshold
+```
+
+#### Explanation
+This is an experimental extension that was not proposed in the original 2003 paper. Although Poisson cloning is excellent at removing seams, differences between cloned textures and the destination textures (e.g. grain) can still leave an apparent seam around the cloning region. In an effort to preserve grain and other small details of the destination, gradients in the destination below the threshold are added onto the source gradient in this mode. Unfortunately, this method is not always successful as discoloration occasionally pops up, and it is not able to remove any grain from the source (so it effectively only adds grain and other nearly imperceptible details).
+
+#### Results
+
+| Poisson Cloning vs. Poisson Cloning with Texture Preservation |
+|:--------------:|
+| ![Texture Comparison](/results/texture_comparison.png?raw=true) |
 
 
 ## Authors
@@ -243,11 +287,11 @@ Usage: `$./poisson_clone src.png mask.png dest.png out.png xOffset yOffset [flag
   * xOffset => x offset in src.png (required)
   * yOffset => y offset in src.png (required)
   * flag argument (optional):
-    * no flag or unrecognized flag => seamless poisson cloning
+    * no flag or unrecognized flag => seamless Poisson cloning
     * "-d" or "-direct" => direct cloning
-    * "-mono" or "-monochrome" => convert src to monochrome before applying poisson cloning
+    * "-mono" or "-monochrome" => convert src to monochrome before applying Poisson cloning
     * "-mx" or "-mixed" => use mixed cloning (mix gradients of dest and src)
 
 Tip: To line up the offsets of your source image within the mask, run with the
     direct cloning flag ("-d" or "-direct") enabled. Then, once you know the
-    proper offset for cloning, remove the flag to run poisson cloning.
+    proper offset for cloning, remove the flag to run Poisson cloning.
