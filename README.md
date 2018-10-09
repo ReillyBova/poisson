@@ -80,6 +80,7 @@ for each pixel i in the mask:
 | ![Direct Cloning](/results/fig3b_direct.png?raw=true) | ![Poisson Cloning](/results/fig3b_poisson.png?raw=true) |
 | ![Direct Cloning](/results/fig4_direct.png?raw=true) | ![Poisson Cloning](/results/fig4_poisson.png?raw=true) |
 
+
 ### Direct Cloning
 #### Usage
 Direct cloning is the naive (seamed) implementation of cloning and requires a `-d` or `-direct` flag. It takes no further parameters:
@@ -92,16 +93,17 @@ or
 $ ./poisson_clone src.png mask.png dest.png out.png xOffset yOffset -direct
 ```
 
+
 ### Monochromatic Poisson Cloning
 #### Usage
-Monochromatic cloning requires the `-mono` or `-monochromatic` flag and takes no further parameters:
+Monochromatic cloning requires the `-mono` or `-monochrome` flag and takes no further parameters:
 
 ```
 $ ./poisson_clone src.png mask.png dest.png out.png xOffset yOffset -mono
 ```
 or
 ```
-$ ./poisson_clone src.png mask.png dest.png out.png xOffset yOffset -monochromatic
+$ ./poisson_clone src.png mask.png dest.png out.png xOffset yOffset -monochrome
 ```
 
 #### Explanation
@@ -112,6 +114,7 @@ First monochromatic cloning converts the source image to greyscale through lumin
 | Source | Destination | Polychromatic Poisson Cloning | Monochromatic Poisson Cloning | 
 |:--------------:|:----------------:|:----------------:|:----------------:|
 | ![Source](/test_images/perez-fig5-src.png?raw=true) | ![Destination](/test_images/perez-fig5-dst.png?raw=true) |![Poisson Cloning](/results/fig5_poisson.png?raw=true) | ![Monochromatic Cloning](/results/fig5_mono.png?raw=true) |
+
 
 ### Mixed Poisson Cloning
 #### Usage
@@ -135,6 +138,27 @@ Sometimes there is detail in the target region of the destination that needs to 
 | ![Source](/test_images/perez-fig6-src.png?raw=true) | ![Destination](/test_images/perez-fig6-dst.png?raw=true) |![Poisson Cloning](/results/fig6_poisson.png?raw=true) | ![Mixed Cloning](/results/fig6_mixed.png?raw=true) |
 | ![Source](/test_images/perez-fig7-src.png?raw=true) | ![Destination](/test_images/perez-fig7-dst.png?raw=true) |![Poisson Cloning](/results/fig7_poisson.png?raw=true) | ![Mixed Cloning](/results/fig7_mixed.png?raw=true) |
 | ![Source](/test_images/perez-fig8-src.png?raw=true) | ![Destination](/test_images/perez-fig8-dst.png?raw=true) |![Poisson Cloning](/results/fig8_poisson.png?raw=true) | ![Mixed Cloning](/results/fig8_mixed.png?raw=true) |
+
+### Image Flattening
+#### Usage
+Image flattening requires the `-f` or `-flat` flag along with `threshold` and `factor` values. It is recommended that the source and destination arguments point to the same image, and that the offsets are set to `0`:
+
+```
+$ ./poisson_clone src.png mask.png src.png out.png 0 0 -f threshold factor
+```
+or
+```
+$ ./poisson_clone src.png mask.png src.png out.png 0 0 - flat threshold factor
+```
+
+#### Explanation
+Image flattening throws away gradients in the source that do not exceed the threshold value in magnitude. As such, only the sharper edges and features of the image are preserved, giving a flattening feel. The preserved gradients are either compressed or heightened depending on whether `factor` is greater than or less than `1` respectively.
+
+#### Results
+
+| Source | Image Flattening |
+|:--------------:|:----------------:|
+| ![Source](/test_images/perez-fig9-src.png?raw=true) | ![Flat](/results/fig9_flat.png?raw=true) |
 
 
 
