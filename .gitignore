@@ -31,3 +31,4 @@
 *.out
 *.app
 poisson_clone
+imageio++_test
